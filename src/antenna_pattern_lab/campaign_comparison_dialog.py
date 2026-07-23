@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from .analysis import LocatedSpot
 from .campaign_comparison import compare_campaign_conditions
 from .campaigns import MeasurementCampaign
+from .theme import TOKENS, apply_figure_theme, semantic_style
 
 
 TEXT = {
@@ -127,7 +128,7 @@ class CampaignComparisonDialog(QDialog):
         heading.setStyleSheet("font-size: 16px; font-weight: 700;")
         layout.addWidget(heading)
         self.quality = QLabel(self.text["quality"][self.result.quality])
-        colors = {"good": "#1a7f37", "medium": "#9a6700", "low": "#cf222e"}
+        colors = {"good": TOKENS.success, "medium": TOKENS.warning, "low": TOKENS.danger}
         self.quality.setStyleSheet(
             f"color: {colors[self.result.quality]}; font-weight: 700;"
         )
@@ -158,11 +159,11 @@ class CampaignComparisonDialog(QDialog):
             " · ".join(recommendations) or self.text["none_missing"]
         )
         self.recommendation.setWordWrap(True)
-        self.recommendation.setStyleSheet("color: #0969da; font-weight: 700;")
+        self.recommendation.setStyleSheet(semantic_style("info", bold=True))
         layout.addWidget(self.recommendation)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.figure = Figure(figsize=(6, 4), facecolor="#ffffff")
+        self.figure = Figure(figsize=(6, 4), facecolor=TOKENS.panel_background)
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(self.text["headers"])
@@ -176,7 +177,7 @@ class CampaignComparisonDialog(QDialog):
 
         note = QLabel(self.text["note"])
         note.setWordWrap(True)
-        note.setStyleSheet("color: #57606a;")
+        note.setStyleSheet(semantic_style("text_secondary"))
         layout.addWidget(note)
         close_button = QPushButton(self.text["close"])
         close_button.clicked.connect(self.accept)
@@ -201,18 +202,19 @@ class CampaignComparisonDialog(QDialog):
         axis = self.figure.add_subplot(111)
         positions = list(range(len(values)))
         colors = [
-            "#1a7f37" if value >= 70 else "#bf8700" if value >= 50 else "#cf222e"
+            TOKENS.success if value >= 70 else TOKENS.warning if value >= 50 else TOKENS.danger
             for value in values
         ]
         axis.barh(positions, values, color=colors)
         axis.set_yticks(positions, labels=self.text["metrics"])
         axis.set_xlim(0, 100)
         axis.set_xlabel("%")
-        axis.axvline(60, color="#57606a", linestyle="--", linewidth=1)
-        axis.grid(axis="x", color="#d0d7de", alpha=0.7)
+        axis.axvline(60, color=TOKENS.text_secondary, linestyle="--", linewidth=1)
+        axis.grid(axis="x", color=TOKENS.chart_grid, alpha=0.7)
         axis.invert_yaxis()
         for position, value in zip(positions, values):
             axis.text(min(value + 2, 96), position, f"{value:.0f}%", va="center")
+        apply_figure_theme(self.figure)
         self.figure.tight_layout()
         self.canvas.draw_idle()
 
@@ -220,13 +222,13 @@ class CampaignComparisonDialog(QDialog):
         self.table.setRowCount(len(self.result.slots))
         for row, slot in enumerate(self.result.slots):
             if slot.blocks_a and slot.blocks_b:
-                status, color = self.text["both"], "#1a7f37"
+                status, color = self.text["both"], TOKENS.success
             elif slot.blocks_a:
-                status, color = self.text["a_only"], "#9a6700"
+                status, color = self.text["a_only"], TOKENS.warning
             elif slot.blocks_b:
-                status, color = self.text["b_only"], "#9a6700"
+                status, color = self.text["b_only"], TOKENS.warning
             else:
-                status, color = self.text["empty"], "#57606a"
+                status, color = self.text["empty"], TOKENS.text_secondary
             values = (slot.label, str(slot.blocks_a), str(slot.blocks_b), status)
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)

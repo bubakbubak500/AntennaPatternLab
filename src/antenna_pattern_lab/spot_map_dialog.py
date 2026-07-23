@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout
 from .analysis import LocatedSpot
 from .geo import great_circle_segments, maidenhead_to_latlon
 from .world_map import load_land_polygons
+from .theme import TOKENS
 
 
 TEXT = {
@@ -131,7 +132,7 @@ class SpotMapDialog(QDialog):
         self.summary.setWordWrap(True)
         layout.addWidget(self.summary)
 
-        self.figure = Figure(figsize=(12, 7), facecolor="#ffffff")
+        self.figure = Figure(figsize=(12, 7), facecolor=TOKENS.panel_background)
         self.canvas = FigureCanvasQTAgg(self.figure)
         layout.addWidget(self.canvas, 1)
         self.detail = QLabel(self.text["hint"] if self.points else self.text["empty"])
@@ -145,11 +146,11 @@ class SpotMapDialog(QDialog):
 
     def _draw_map(self) -> None:
         axis = self.axis
-        axis.set_facecolor("#dff1fb")
+        axis.set_facecolor(TOKENS.map_water)
         land = PolyCollection(
             load_land_polygons(),
-            facecolor="#edf2e8",
-            edgecolor="#8c959f",
+            facecolor=TOKENS.map_land,
+            edgecolor=TOKENS.text_muted,
             linewidth=0.45,
             closed=True,
             zorder=1,
@@ -160,11 +161,11 @@ class SpotMapDialog(QDialog):
         axis.set_aspect("equal", adjustable="box")
         axis.set_xticks(range(-180, 181, 30))
         axis.set_yticks(range(-90, 91, 30))
-        axis.grid(color="#b6c2cf", linewidth=0.5, alpha=0.65, zorder=0)
-        axis.tick_params(colors="#57606a", labelsize=8)
-        axis.set_xlabel("Longitude (°)", color="#1f2328")
-        axis.set_ylabel("Latitude (°)", color="#1f2328")
-        axis.set_title(self.text["map_title"], color="#1f2328", pad=8)
+        axis.grid(color=TOKENS.chart_grid, linewidth=0.5, alpha=0.65, zorder=0)
+        axis.tick_params(colors=TOKENS.chart_labels, labelsize=8)
+        axis.set_xlabel("Longitude (°)", color=TOKENS.text_primary)
+        axis.set_ylabel("Latitude (°)", color=TOKENS.text_primary)
+        axis.set_title(self.text["map_title"], color=TOKENS.text_primary, pad=8)
 
         self.scatter = axis.scatter(
             [point.rx_longitude for point in self.points],
@@ -175,7 +176,7 @@ class SpotMapDialog(QDialog):
             vmin=-25,
             vmax=10,
             alpha=0.9,
-            edgecolors="#ffffff",
+            edgecolors=TOKENS.panel_background,
             linewidths=0.7,
             label=self.text["rx"],
             zorder=4,
@@ -184,8 +185,8 @@ class SpotMapDialog(QDialog):
             colorbar = self.figure.colorbar(
                 self.scatter, ax=axis, orientation="horizontal", pad=0.08, fraction=0.045
             )
-            colorbar.set_label(self.text["snr"], color="#1f2328")
-            colorbar.ax.tick_params(colors="#57606a", labelsize=8)
+            colorbar.set_label(self.text["snr"], color=TOKENS.text_primary)
+            colorbar.ax.tick_params(colors=TOKENS.chart_labels, labelsize=8)
 
         transmitters = {
             (point.tx_latitude, point.tx_longitude) for point in self.points
@@ -198,15 +199,15 @@ class SpotMapDialog(QDialog):
                 [latitude],
                 marker="*",
                 s=170,
-                color="#b42318",
-                edgecolors="#ffffff",
+                color=TOKENS.danger,
+                edgecolors=TOKENS.panel_background,
                 linewidths=0.8,
                 label=self.text["tx"].format(call=self.tx_call) if index == 0 else None,
                 zorder=6,
             )
         if self.points:
             legend = axis.legend(loc="lower left")
-            legend.get_frame().set_facecolor("#ffffff")
+            legend.get_frame().set_facecolor(TOKENS.surface_1)
             legend.get_frame().set_alpha(0.92)
 
         self.annotation = axis.annotate(
@@ -214,8 +215,8 @@ class SpotMapDialog(QDialog):
             xy=(0, 0),
             xytext=(14, 14),
             textcoords="offset points",
-            bbox={"boxstyle": "round", "fc": "#ffffff", "ec": "#0969da"},
-            color="#1f2328",
+            bbox={"boxstyle": "round", "fc": TOKENS.surface_1, "ec": TOKENS.accent},
+            color=TOKENS.text_primary,
             fontsize=9,
             zorder=8,
         )
@@ -254,7 +255,7 @@ class SpotMapDialog(QDialog):
             artist, = self.axis.plot(
                 [coordinate[1] for coordinate in segment],
                 [coordinate[0] for coordinate in segment],
-                color="#f0883e",
+                color=TOKENS.warning,
                 linewidth=2.2,
                 alpha=0.95,
                 zorder=3,

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from .analysis import ab_sector_profile, compare_profile_spots, recommend_ab_measurement
 from .storage import SpotRepository
+from .theme import TOKENS, apply_figure_theme, semantic_style
 
 TEXT = {
     "CZE": {
@@ -108,19 +109,19 @@ class AbComparisonDialog(QDialog):
         layout.addLayout(form)
         note = QLabel(self.text["note"])
         note.setWordWrap(True)
-        note.setStyleSheet("color: #9a6700;")
+        note.setStyleSheet(semantic_style("warning"))
         layout.addWidget(note)
         self.summary = QLabel()
         self.summary.setStyleSheet("font-size: 16px; font-weight: 700;")
         layout.addWidget(self.summary)
         self.recommendation = QLabel()
         self.recommendation.setWordWrap(True)
-        self.recommendation.setStyleSheet("color: #0969da;")
+        self.recommendation.setStyleSheet(semantic_style("info"))
         layout.addWidget(self.recommendation)
         tabs = QTabWidget()
         direction_page = QWidget()
         direction_layout = QVBoxLayout(direction_page)
-        self.figure = Figure(figsize=(7, 3), facecolor="#ffffff")
+        self.figure = Figure(figsize=(7, 3), facecolor=TOKENS.panel_background)
         self.canvas = FigureCanvasQTAgg(self.figure)
         direction_layout.addWidget(self.canvas, 1)
         self.sector_table = QTableWidget(0, 6)
@@ -237,11 +238,11 @@ class AbComparisonDialog(QDialog):
     def _draw_sectors(self, sectors) -> None:
         self.figure.clear()
         axis = self.figure.add_subplot(111)
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         used = [sector for sector in sectors if sector.count]
         x = [sector.center_deg for sector in used]
         y = [sector.median_delta_db for sector in used]
-        colors = ["#1a7f37" if value >= 0 else "#b42318" for value in y]
+        colors = [TOKENS.success if value >= 0 else TOKENS.danger for value in y]
         errors = []
         for sector, value in zip(used, y):
             if sector.confidence_low_db is None:
@@ -257,16 +258,17 @@ class AbComparisonDialog(QDialog):
                 y,
                 yerr=[[item[0] for item in errors], [item[1] for item in errors]],
                 fmt="none",
-                ecolor="#57606a",
+                ecolor=TOKENS.text_secondary,
                 capsize=3,
             )
-        axis.axhline(0, color="#8c959f", linewidth=1)
+        axis.axhline(0, color=TOKENS.text_muted, linewidth=1)
         axis.set_xlim(0, 360)
         axis.set_xticks(range(0, 361, 45))
-        axis.set_xlabel("Azimut / Bearing (°)", color="#1f2328")
-        axis.set_ylabel("B − A (dB)", color="#1f2328")
-        axis.set_title(self.text["sector_plot"], color="#1f2328")
-        axis.tick_params(colors="#57606a")
-        axis.grid(axis="y", color="#d0d7de", alpha=0.8)
+        axis.set_xlabel("Azimut / Bearing (°)", color=TOKENS.text_primary)
+        axis.set_ylabel("B − A (dB)", color=TOKENS.text_primary)
+        axis.set_title(self.text["sector_plot"], color=TOKENS.text_primary)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(axis="y", color=TOKENS.chart_grid, alpha=0.8)
+        apply_figure_theme(self.figure)
         self.figure.tight_layout()
         self.canvas.draw_idle()
