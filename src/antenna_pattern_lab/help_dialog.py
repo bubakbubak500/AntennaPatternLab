@@ -171,9 +171,10 @@ HELP = {
                 """
                 <h2>Nastavení</h2>
                 <p>Komunikace obsahuje adresy a porty MQTT/WSJT-X/Hamlib/rotátoru.
-                Průvodce externími nástroji pouze nabízí ověřené oficiální
+                Průvodce externími nástroji nabízí ověřené oficiální
                 instalátory a vždy vyžaduje samostatný souhlas se stažením i
-                spuštěním.</p>
+                spuštěním. U Hamlibu načte názvy podporovaných rádií a umí po
+                stisku tlačítka spustit nakonfigurovaný <code>rigctld</code>.</p>
                 <p>Aktualizace jsou opt-in, používají HTTPS manifest a povinný
                 SHA-256. Uživatelská data leží mimo instalační adresář.</p>
                 """,
@@ -221,7 +222,7 @@ HELP = {
             ("experiments", "A/B experiments", "<h2>A/B experiments</h2><p>The guided protocol changes profiles only after physical-switch confirmation. Comparison pairs nearby reports from the same RX and gives each receiver equal result weight.</p><p>Keep band, power and distance layer comparable and alternate profiles in time. A bootstrap interval describes sampling uncertainty but does not prove causality.</p>"),
             ("coverage", "Coverage and planning", "<h2>Coverage and planning</h2><p>Coverage combines report, RX, time-block and interval support. The bearing × distance × day/night matrix reveals one-sided samples. The next-window planner uses observed RX availability and missing cells; it is not an ionospheric forecast.</p>"),
             ("hardware", "Hamlib and rotator", "<h2>Rig and rotator</h2><p><code>rigctld</code> supplies read-only frequency, mode and PTT. <code>rotctld</code> supplies actual position. Movement and profile-axis mismatch are warned and stored with TX quality.</p><p>The current safety model sends no command to the rig, rotator or WSJT-X.</p>"),
-            ("settings", "Settings and external tools", "<h2>Settings</h2><p>Communications contains MQTT/WSJT-X/Hamlib/rotator addresses and ports. The external-tool assistant offers verified official installers and requires separate download and launch consent.</p><p>Updates are opt-in and require an HTTPS manifest plus SHA-256. User data remains outside the install directory.</p>"),
+            ("settings", "Settings and external tools", "<h2>Settings</h2><p>Communications contains MQTT/WSJT-X/Hamlib/rotator addresses and ports. The external-tool assistant offers verified official installers and requires separate download and launch consent. For Hamlib it loads the supported radio names and can start the configured <code>rigctld</code> when you press the button.</p><p>Updates are opt-in and require an HTTPS manifest plus SHA-256. User data remains outside the install directory.</p>"),
             ("data_safety", "Database and diagnostics", "<h2>Data safety</h2><p>A verified SQLite backup is created before schema migration. Corrupt, unverifiable or newer schemas stop the migration. Five backups are retained.</p><p>The local diagnostic JSON is created only after confirmation and contains configuration, connection state and database integrity—not individual spots, messages or passwords.</p>"),
             ("interpretation", "Correct interpretation", "<h2>Correct interpretation</h2><p>The result is an empirical reach profile for a particular station, time, band, mode, power, receiver network and propagation state. It is most useful for repeated controlled comparisons.</p><p>A spot alone does not establish absolute gain, elevation pattern or efficiency. Do not mix bands, modes, major power changes, ADIF QSOs and passive reports without the source filter. Strong conclusions need angular, temporal and receiver diversity.</p>"),
         ],

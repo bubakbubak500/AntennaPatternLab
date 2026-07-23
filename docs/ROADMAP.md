@@ -31,7 +31,7 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [x] typově správný význam orientace a referenční osy v polárním grafu,
 - [x] ruční evidence výkonu a stavu tuneru v profilu,
 - [x] volitelný read-only Hamlib/rigctld monitor frekvence, módu a PTT,
-- [x] detekce Hamlibu a průvodce Hamlib model ID/COM port/baud/rigctld příkazem bez tichého spuštění,
+- [x] detekce Hamlibu a průvodce modelem rádia/COM portem/baud rate včetně řízeného spuštění `rigctld`,
 - [x] automatická evidence relativního RFPOWER a volitelného SWR, pokud ji rádio/backend přes Hamlib poskytuje,
 - [x] přiřazení spotů ke konkrétní TX relaci a konfiguraci,
 - [x] časová osa experimentu a kontrola kvality přiřazení TX relací.
@@ -94,6 +94,14 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [ ] provést nativní Windows test s odečítačem obrazovky a přechodem okna mezi monitory s rozdílným DPI,
 - [ ] znovu vyhodnotit přechod reportů z `QTableWidget` na modelový `QTableView` pouze tehdy, pokud měření ukáže problém s výkonem nebo údržbou.
 
+## UX milník 0.38 — Hamlib modely a spuštění rigctld
+
+- [x] načíst z nainstalované verze Hamlibu úplné mapování model ID → výrobce a název rádia,
+- [x] nabídnout prohledávatelný výběr podporovaných rádií se zachováním dříve uloženého ID,
+- [x] odstranit pasivní náhled příkazové řádky a nahradit jej akcí **Spustit rigctld**,
+- [x] před spuštěním validovat model, COM port, baud rate a TCP port a zabránit zjevnému duplicitnímu startu na obsazeném portu,
+- [x] zobrazit nebarevný stav spouštění, úspěchu nebo selhání; WSJT-X UDP konfiguraci ponechat beze změny.
+
 ## Milník 4 — A/B experimenty
 
 - [x] protokol a časovač řízeného střídání konfigurací A/B s potvrzením fyzické změny,
@@ -123,7 +131,7 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [x] atomické stažení do uživatelské složky a samostatné potvrzení před spuštěním vendor instalátoru,
 - [x] spuštění vendor instalátoru přes Windows ShellExecute/UAC místo přímého CreateProcess,
 - [x] nikdy neinstalovat Hamlib ani WSJT-X tiše bez výslovného souhlasu uživatele,
-- [x] průvodce Hamlib model ID, COM portem, baud rate, příkazem rigctld a kontrolou spojení,
+- [x] průvodce prohledávatelným seznamem Hamlib rádií, COM portem, baud rate, TCP portem a řízeným spuštěním `rigctld`,
 - [x] průvodce nastavením WSJT-X UDP portu a ověřením první Heartbeat zprávy,
 - [x] aktualizace přes stejné AppId se zachováním databáze a uživatelských profilů mimo instalační adresář,
 - [x] opt-in automatická kontrola přes validovaný HTTPS manifest a stažení s povinným SHA-256,

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import shutil
+import socket
+import subprocess
 from typing import Callable, Mapping
 
 HAMLIB_RELEASES_URL = "https://github.com/Hamlib/Hamlib/releases/latest"
@@ -17,6 +19,19 @@ class DependencyStatus:
     found: bool
     executable: Path | None
     official_url: str
+
+
+@dataclass(frozen=True, slots=True)
+class HamlibRigModel:
+    model_id: int
+    manufacturer: str
+    model: str
+    version: str
+    status: str
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.model_id} — {self.manufacturer} {self.model} [{self.status}]"
 
 
 def detect_external_tools(
@@ -125,3 +140,76 @@ def rigctld_command(
         str(executable), "-m", str(model_id), "-r", serial_port.strip(),
         "-s", str(baud_rate), "-t", str(tcp_port),
     )
+
+
+def list_hamlib_rig_models(
+    executable: str | Path,
+    *,
+    timeout: float = 10.0,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> tuple[HamlibRigModel, ...]:
+    """Return the radio backends reported by the installed Hamlib version."""
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    result = runner(
+        (str(executable), "-l"),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+        check=True,
+        creationflags=creationflags,
+    )
+    lines = result.stdout.splitlines()
+    header_index = next(
+        (index for index, line in enumerate(lines) if "Rig #" in line and "Mfg" in line),
+        None,
+    )
+    if header_index is None:
+        raise ValueError("Hamlib did not return a recognizable rig model list.")
+    header = lines[header_index]
+    columns = tuple(header.index(name) for name in ("Rig #", "Mfg", "Model", "Version", "Status"))
+    models: list[HamlibRigModel] = []
+    for line in lines[header_index + 1 :]:
+        if not line.strip():
+            continue
+        fields = tuple(
+            line[columns[index] : columns[index + 1]].strip()
+            for index in range(len(columns) - 1)
+        ) + (line[columns[-1] :].split(maxsplit=1)[0],)
+        try:
+            model_id = int(fields[0])
+        except (ValueError, IndexError):
+            continue
+        models.append(HamlibRigModel(model_id, *fields[1:]))
+    if not models:
+        raise ValueError("Hamlib returned an empty rig model list.")
+    return tuple(models)
+
+
+def tcp_port_is_open(port: int, host: str = "127.0.0.1", timeout: float = 0.2) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def launch_rigctld(command: tuple[str, ...]) -> int:
+    """Launch rigctld independently and return its process identifier."""
+    kwargs: dict[str, object] = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "close_fds": True,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = (
+            subprocess.CREATE_NEW_PROCESS_GROUP
+            | subprocess.DETACHED_PROCESS
+            | subprocess.CREATE_NO_WINDOW
+        )
+    else:
+        kwargs["start_new_session"] = True
+    process = subprocess.Popen(command, **kwargs)
+    return process.pid

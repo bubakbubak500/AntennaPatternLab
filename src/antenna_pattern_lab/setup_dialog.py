@@ -8,6 +8,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QCompleter,
     QDialog,
     QFormLayout,
     QHBoxLayout,
@@ -20,7 +21,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .dependencies import DependencyStatus, detect_external_tools, rigctld_command
+from .dependencies import (
+    DependencyStatus,
+    detect_external_tools,
+    launch_rigctld,
+    list_hamlib_rig_models,
+    rigctld_command,
+    tcp_port_is_open,
+)
 from .external_install import (
     download_release_asset,
     fetch_release_asset,
@@ -51,11 +59,21 @@ TEXT = {
         "confirm": "Otevřít v prohlížeči výhradně oficiální stránku projektu {name}? Instalaci budete řídit sami.",
         "recheck": "Znovu ověřit",
         "hamlib_setup": "Volitelná konfigurace rigctld",
-        "model": "Hamlib model ID",
+        "model": "Model rádia",
         "serial": "COM port",
         "baud": "Rychlost",
         "hamlib_port": "TCP port rigctld",
-        "command": "Příkaz rigctld (náhled)",
+        "start_rigctld": "Spustit rigctld",
+        "rigctld_ready": "Připraveno ke spuštění",
+        "rigctld_missing": "Nejdříve nainstalujte Hamlib",
+        "rigctld_starting": "Spouštím…",
+        "rigctld_started": "Běží na portu {port} (PID {pid})",
+        "rigctld_already_running": "Port {port} už používá běžící služba",
+        "rigctld_failed": "rigctld se nepodařilo spustit",
+        "models_failed": "Názvy modelů nelze z Hamlibu načíst: {detail}",
+        "saved_model": "{model_id} — uložené ID",
+        "model_help": "Začněte psát ID, výrobce nebo název rádia.",
+        "select_model": "Vyberte rádio ze seznamu modelů podporovaných Hamlibem.",
         "wsjtx_setup": "WSJT-X UDP Reporting",
         "wsjtx_port": "UDP port",
         "wsjtx_note": "Ve WSJT-X nastavte UDP Server 127.0.0.1 a stejný port. Spojení potvrdí až první Heartbeat.",
@@ -83,11 +101,21 @@ TEXT = {
         "confirm": "Open only the official {name} project page in your browser? You will control the installation yourself.",
         "recheck": "Check again",
         "hamlib_setup": "Optional rigctld configuration",
-        "model": "Hamlib model ID",
+        "model": "Radio model",
         "serial": "COM port",
         "baud": "Baud rate",
         "hamlib_port": "rigctld TCP port",
-        "command": "rigctld command preview",
+        "start_rigctld": "Start rigctld",
+        "rigctld_ready": "Ready to start",
+        "rigctld_missing": "Install Hamlib first",
+        "rigctld_starting": "Starting…",
+        "rigctld_started": "Running on port {port} (PID {pid})",
+        "rigctld_already_running": "Port {port} is already used by a running service",
+        "rigctld_failed": "Could not start rigctld",
+        "models_failed": "Could not load model names from Hamlib: {detail}",
+        "saved_model": "{model_id} — saved ID",
+        "model_help": "Type a model ID, manufacturer, or radio name to search.",
+        "select_model": "Select a radio from the list of models supported by Hamlib.",
         "wsjtx_setup": "WSJT-X UDP Reporting",
         "wsjtx_port": "UDP port",
         "wsjtx_note": "Set UDP Server in WSJT-X to 127.0.0.1 and the same port. The first Heartbeat confirms the connection.",
@@ -122,6 +150,9 @@ class SetupDialog(QDialog):
         self._install_bridge.completed.connect(self._download_completed)
         self._install_bridge.failed.connect(self._download_failed)
         self._progress_dialog: QProgressDialog | None = None
+        self._loaded_models_for: Path | None = None
+        self._rigctld_launch_attempts = 0
+        self._rigctld_pid: int | None = None
         self.setWindowTitle(self.text["title"])
         self.resize(760, 410)
         layout = QVBoxLayout(self)
@@ -163,9 +194,24 @@ class SetupDialog(QDialog):
         hamlib_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         hamlib_form.setHorizontalSpacing(12)
         hamlib_form.setVerticalSpacing(8)
-        self.rig_model = QSpinBox()
-        self.rig_model.setRange(1, 99999)
-        self.rig_model.setValue(int(settings.value("rig_model_id", 1)))
+        self.rig_model = QComboBox()
+        self.rig_model.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.rig_model.setMinimumContentsLength(34)
+        self.rig_model.setEditable(True)
+        self.rig_model.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.rig_model.completer().setCompletionMode(
+            QCompleter.CompletionMode.PopupCompletion
+        )
+        self.rig_model.completer().setFilterMode(Qt.MatchFlag.MatchContains)
+        self.rig_model.completer().setCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        self.rig_model.setAccessibleName(self.text["model"])
+        self.rig_model.setAccessibleDescription(self.text["model_help"])
+        self.rig_model.setToolTip(self.text["model_help"])
+        self._set_saved_rig_model(int(settings.value("rig_model_id", 1)))
         self.serial_port = QLineEdit(str(settings.value("rig_serial_port", "COM3")))
         self.baud_rate = QComboBox()
         for rate in (4800, 9600, 19200, 38400, 57600, 115200):
@@ -174,13 +220,19 @@ class SetupDialog(QDialog):
         self.hamlib_port = QSpinBox()
         self.hamlib_port.setRange(1, 65535)
         self.hamlib_port.setValue(int(settings.value("hamlib_port", 4532)))
-        self.command_preview = QLineEdit()
-        self.command_preview.setReadOnly(True)
+        rigctld_actions = QHBoxLayout()
+        self.start_rigctld_button = QPushButton(self.text["start_rigctld"])
+        self.start_rigctld_button.setAccessibleName(self.text["start_rigctld"])
+        self.start_rigctld_button.clicked.connect(self.start_rigctld)
+        self.rigctld_status = QLabel(self.text["rigctld_missing"])
+        self.rigctld_status.setWordWrap(True)
+        rigctld_actions.addWidget(self.start_rigctld_button)
+        rigctld_actions.addWidget(self.rigctld_status, 1)
         hamlib_form.addRow(self.text["model"], self.rig_model)
         hamlib_form.addRow(self.text["serial"], self.serial_port)
         hamlib_form.addRow(self.text["baud"], self.baud_rate)
         hamlib_form.addRow(self.text["hamlib_port"], self.hamlib_port)
-        hamlib_form.addRow(self.text["command"], self.command_preview)
+        hamlib_form.addRow("", rigctld_actions)
         layout.addLayout(hamlib_form)
 
         wsjtx_title = QLabel(self.text["wsjtx_setup"])
@@ -210,14 +262,42 @@ class SetupDialog(QDialog):
         buttons.addWidget(later)
         buttons.addWidget(finish)
         layout.addLayout(buttons)
-        for control in (self.rig_model, self.serial_port, self.baud_rate, self.hamlib_port):
-            if isinstance(control, QLineEdit):
-                control.textChanged.connect(self.update_command_preview)
-            elif isinstance(control, QComboBox):
-                control.currentIndexChanged.connect(self.update_command_preview)
-            else:
-                control.valueChanged.connect(self.update_command_preview)
         self.refresh_detection()
+
+    def _set_saved_rig_model(self, model_id: int) -> None:
+        self.rig_model.clear()
+        self.rig_model.addItem(self.text["saved_model"].format(model_id=model_id), model_id)
+
+    def _load_rig_models(self, executable: Path) -> None:
+        if self._loaded_models_for == executable:
+            return
+        saved_model_id = int(
+            self.rig_model.currentData()
+            if self.rig_model.currentData() is not None
+            else self.settings.value("rig_model_id", 1)
+        )
+        try:
+            models = list_hamlib_rig_models(executable)
+        except Exception as exc:
+            self._loaded_models_for = None
+            self.rig_model.setToolTip(
+                self.text["models_failed"].format(detail=str(exc))
+            )
+            return
+        self.rig_model.clear()
+        for model in models:
+            self.rig_model.addItem(model.display_name, model.model_id)
+        selected = self.rig_model.findData(saved_model_id)
+        if selected < 0:
+            self.rig_model.insertItem(
+                0,
+                self.text["saved_model"].format(model_id=saved_model_id),
+                saved_model_id,
+            )
+            selected = 0
+        self.rig_model.setCurrentIndex(selected)
+        self.rig_model.setToolTip(self.text["model_help"])
+        self._loaded_models_for = executable
 
     def refresh_detection(self) -> None:
         self.statuses = {status.key: status for status in detect_external_tools()}
@@ -229,6 +309,12 @@ class SetupDialog(QDialog):
                 label.setStyleSheet(semantic_style("success"))
                 self.install_buttons[key].setText(self.text["installed"])
                 self.install_buttons[key].setEnabled(False)
+                if key == "hamlib" and status.executable is not None:
+                    self._load_rig_models(status.executable)
+                    self.start_rigctld_button.setEnabled(True)
+                    if self._rigctld_pid is None:
+                        self.rigctld_status.setText(self.text["rigctld_ready"])
+                        self.rigctld_status.setStyleSheet(semantic_style("info"))
             elif key == self._pending_install_key:
                 label.setText(self.text["checking_install"])
                 label.setToolTip("")
@@ -241,7 +327,10 @@ class SetupDialog(QDialog):
                 label.setStyleSheet(semantic_style("danger"))
                 self.install_buttons[key].setText(self.text["install"])
                 self.install_buttons[key].setEnabled(True)
-        self.update_command_preview()
+                if key == "hamlib":
+                    self.start_rigctld_button.setEnabled(False)
+                    self.rigctld_status.setText(self.text["rigctld_missing"])
+                    self.rigctld_status.setStyleSheet(semantic_style("inactive"))
         if (
             self._pending_install_key
             and self.statuses.get(self._pending_install_key)
@@ -267,20 +356,73 @@ class SetupDialog(QDialog):
                 self.status_labels[key].setStyleSheet(semantic_style("danger"))
                 self.install_buttons[key].setEnabled(True)
 
-    def update_command_preview(self) -> None:
+    def _rigctld_command(self) -> tuple[str, ...]:
         hamlib = self.statuses.get("hamlib")
-        executable = hamlib.executable if hamlib and hamlib.executable else "rigctld.exe"
-        try:
-            command = rigctld_command(
-                executable,
-                self.rig_model.value(),
-                self.serial_port.text(),
-                int(self.baud_rate.currentData()),
-                self.hamlib_port.value(),
+        if not hamlib or not hamlib.executable:
+            raise ValueError(self.text["rigctld_missing"])
+        return rigctld_command(
+            hamlib.executable,
+            self._rig_model_id(),
+            self.serial_port.text(),
+            int(self.baud_rate.currentData()),
+            self.hamlib_port.value(),
+        )
+
+    def _rig_model_id(self) -> int:
+        model_id = self.rig_model.currentData()
+        if model_id is None:
+            exact = self.rig_model.findText(
+                self.rig_model.currentText(),
+                Qt.MatchFlag.MatchFixedString,
             )
-            self.command_preview.setText(" ".join(f'"{item}"' if " " in item else item for item in command))
-        except ValueError:
-            self.command_preview.clear()
+            if exact >= 0:
+                model_id = self.rig_model.itemData(exact)
+        if model_id is None:
+            raise ValueError(self.text["select_model"])
+        return int(model_id)
+
+    def start_rigctld(self) -> None:
+        port = self.hamlib_port.value()
+        if tcp_port_is_open(port):
+            self.rigctld_status.setText(
+                self.text["rigctld_already_running"].format(port=port)
+            )
+            self.rigctld_status.setStyleSheet(semantic_style("success"))
+            return
+        try:
+            command = self._rigctld_command()
+            self._save_hamlib_settings()
+            self._rigctld_pid = launch_rigctld(command)
+        except Exception as exc:
+            self.rigctld_status.setText(str(exc))
+            self.rigctld_status.setStyleSheet(semantic_style("danger"))
+            QMessageBox.warning(self, self.text["rigctld_failed"], str(exc))
+            return
+        self._rigctld_launch_attempts = 0
+        self.start_rigctld_button.setEnabled(False)
+        self.rigctld_status.setText(self.text["rigctld_starting"])
+        self.rigctld_status.setStyleSheet(semantic_style("info"))
+        QTimer.singleShot(250, self._check_rigctld_started)
+
+    def _check_rigctld_started(self) -> None:
+        self._rigctld_launch_attempts += 1
+        port = self.hamlib_port.value()
+        if tcp_port_is_open(port):
+            self.rigctld_status.setText(
+                self.text["rigctld_started"].format(
+                    port=port,
+                    pid=self._rigctld_pid,
+                )
+            )
+            self.rigctld_status.setStyleSheet(semantic_style("success"))
+            return
+        if self._rigctld_launch_attempts < 8:
+            QTimer.singleShot(250, self._check_rigctld_started)
+            return
+        self.start_rigctld_button.setEnabled(True)
+        self.rigctld_status.setText(self.text["rigctld_failed"])
+        self.rigctld_status.setStyleSheet(semantic_style("danger"))
+        self._rigctld_pid = None
 
     def open_official_source(self, key: str) -> None:
         status = self.statuses[key]
@@ -409,11 +551,18 @@ class SetupDialog(QDialog):
             self._detection_timer.start()
         self._download_key = None
 
-    def save_and_finish(self) -> None:
-        self.settings.setValue("rig_model_id", self.rig_model.value())
+    def _save_hamlib_settings(self) -> None:
+        self.settings.setValue("rig_model_id", self._rig_model_id())
         self.settings.setValue("rig_serial_port", self.serial_port.text().strip())
         self.settings.setValue("rig_baud", int(self.baud_rate.currentData()))
         self.settings.setValue("hamlib_port", self.hamlib_port.value())
+
+    def save_and_finish(self) -> None:
+        try:
+            self._save_hamlib_settings()
+        except ValueError as exc:
+            QMessageBox.warning(self, self.text["rigctld_failed"], str(exc))
+            return
         self.settings.setValue("wsjtx_port", self.wsjtx_port.value())
         self.settings.setValue("onboarding_completed", 1)
         self.settings.sync()

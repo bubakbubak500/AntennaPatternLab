@@ -427,3 +427,26 @@ and report rows without inflating controls.
 - Rendered startup/capture tool: completed all 14 final states
 - Documentation images: 14 baseline and 14 final captures
 - Diff hygiene: `git diff --check` reported no whitespace errors
+
+## 0.38 external-tools dialog validation
+
+The Hamlib portion of the real `SetupDialog` was rendered on 2026-07-23 against
+the locally installed Hamlib 4.7.2 model list. No daemon, radio command, or
+transmission was started during visual validation.
+
+The first implementation render exposed three remaining usability issues:
+
+1. the previous numeric-only model field did not reveal the radio name;
+2. a list containing hundreds of Hamlib backends needed search by ID,
+   manufacturer, and model rather than scrolling alone;
+3. the passive command preview provided no operational feedback and occupied a
+   full form row.
+
+The final dialog uses a searchable model-name mapping, replaces the preview with
+a **Start rigctld** action and textual status, and retains the unchanged WSJT-X
+UDP section. Monitor Light Czech and Monitor Dark English captures are stored as
+`dialog-external-tools-cze-light.png` and
+`dialog-external-tools-eng-dark.png` under `docs/ui/after/`; the supplied 0.37
+dialog capture is stored under `docs/ui/before/`. The dialog was also rendered
+at 200% Qt scaling with no clipping or overlap. Offscreen captures use DejaVu
+Sans because the rendering environment does not expose native Windows fonts.

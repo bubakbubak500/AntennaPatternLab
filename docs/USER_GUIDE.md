@@ -29,6 +29,14 @@ You can skip either dependency:
 - Hamlib is optional and adds radio frequency, mode, and PTT state;
 - demo data and file import work without either tool.
 
+When Hamlib is installed, **Settings → External tools** reads the model IDs,
+manufacturers, radio names, and backend status directly from that installed
+Hamlib version. Search the radio list by ID, manufacturer, or model, set the COM
+port and baud rate, then choose **Start rigctld**. The application validates the
+configuration, saves it, starts the daemon, and reports whether its local TCP
+port became available. It does not send tuning, PTT, or other control commands
+to the radio. The WSJT-X UDP setup is independent and unchanged.
+
 ## 3. WSJT-X connection
 
 In WSJT-X, open **File → Settings → Reporting** and set the UDP server to
