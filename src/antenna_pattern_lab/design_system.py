@@ -190,14 +190,16 @@ class ThemeToggle(QComboBox):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self.addItem("Dark", ThemePreference.DARK)
-        self.addItem("Light", ThemePreference.LIGHT)
-        self.addItem("Follow system", ThemePreference.SYSTEM)
+        self.addItem("Dark", ThemePreference.DARK.value)
+        self.addItem("Light", ThemePreference.LIGHT.value)
+        self.addItem("Follow system", ThemePreference.SYSTEM.value)
         self.currentIndexChanged.connect(
-            lambda index: self.preference_changed.emit(self.itemData(index))
+            lambda index: self.preference_changed.emit(
+                ThemePreference(self.itemData(index))
+            )
         )
 
     def set_preference(self, preference: ThemePreference) -> None:
-        index = self.findData(preference)
+        index = self.findData(preference.value)
         if index >= 0:
             self.setCurrentIndex(index)

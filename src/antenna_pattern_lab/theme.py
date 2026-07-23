@@ -489,7 +489,13 @@ class ThemeController(QObject):
             return CLASSIC_TOKENS
         return DARK_TOKENS if self.effective_theme == ThemePreference.DARK else LIGHT_TOKENS
 
-    def set_selection(self, design_style: DesignStyle, preference: ThemePreference) -> None:
+    def set_selection(
+        self,
+        design_style: DesignStyle | str,
+        preference: ThemePreference | str,
+    ) -> None:
+        design_style = DesignStyle(design_style)
+        preference = ThemePreference(preference)
         self.settings.setValue("ui/design_style", design_style.value)
         self.settings.setValue("ui/theme", preference.value)
         self.settings.sync()

@@ -30,10 +30,12 @@ class AppearanceDialog(QDialog):
         self.design_style = QComboBox()
         self.design_style.addItem(
             "Původní (Classic)" if czech else "Original (Classic)",
-            DesignStyle.CLASSIC,
+            DesignStyle.CLASSIC.value,
         )
-        self.design_style.addItem("Monitor", DesignStyle.MONITOR)
-        self.design_style.setCurrentIndex(self.design_style.findData(design_style))
+        self.design_style.addItem("Monitor", DesignStyle.MONITOR.value)
+        self.design_style.setCurrentIndex(
+            self.design_style.findData(design_style.value)
+        )
         self.theme = ThemeToggle()
         self.theme.set_preference(preference)
         form.addRow("Vzhled" if czech else "Design", self.design_style)
@@ -59,9 +61,12 @@ class AppearanceDialog(QDialog):
         self._update_theme_availability()
 
     def values(self) -> tuple[DesignStyle, ThemePreference]:
-        return self.design_style.currentData(), self.theme.currentData()
+        return (
+            DesignStyle(self.design_style.currentData()),
+            ThemePreference(self.theme.currentData()),
+        )
 
     def _update_theme_availability(self, _index: int | None = None) -> None:
         self.theme.setEnabled(
-            self.design_style.currentData() == DesignStyle.MONITOR
+            self.design_style.currentData() == DesignStyle.MONITOR.value
         )

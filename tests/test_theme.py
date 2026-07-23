@@ -108,11 +108,46 @@ def test_appearance_dialog_only_enables_theme_for_monitor():
     )
     assert not dialog.theme.isEnabled()
     dialog.design_style.setCurrentIndex(
-        dialog.design_style.findData(DesignStyle.MONITOR)
+        dialog.design_style.findData(DesignStyle.MONITOR.value)
     )
     assert dialog.theme.isEnabled()
+    assert dialog.design_style.currentData() == "monitor"
+    assert dialog.theme.currentData() == "system"
     assert dialog.values() == (DesignStyle.MONITOR, ThemePreference.SYSTEM)
     dialog.close()
+    application.processEvents()
+
+
+def test_real_appearance_dialog_selection_persists_and_applies(tmp_path):
+    application = QApplication.instance() or QApplication([])
+    settings = QSettings(str(tmp_path / "real-dialog.ini"), QSettings.Format.IniFormat)
+    window = MainWindow(
+        SpotRepository(tmp_path / "real-dialog.sqlite3"), settings=settings
+    )
+    dialog = AppearanceDialog(
+        window.theme_controller.design_style,
+        window.theme_controller.preference,
+        language="ENG",
+        parent=window,
+    )
+    dialog.design_style.setCurrentIndex(
+        dialog.design_style.findData(DesignStyle.MONITOR.value)
+    )
+    dialog.theme.set_preference(ThemePreference.DARK)
+
+    design_style, preference = dialog.values()
+    window.theme_controller.set_selection(design_style, preference)
+    application.processEvents()
+
+    assert settings.value("ui/design_style") == "monitor"
+    assert settings.value("ui/theme") == "dark"
+    assert window.theme_controller.design_style == DesignStyle.MONITOR
+    assert DARK_TOKENS.application_background in application.styleSheet()
+    window.theme_controller.set_selection(
+        DesignStyle.CLASSIC, ThemePreference.SYSTEM
+    )
+    dialog.close()
+    window.close()
     application.processEvents()
 
 
