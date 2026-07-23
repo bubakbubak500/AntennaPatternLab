@@ -59,3 +59,11 @@ def test_installer_uses_application_icon_and_fills_dependency_memo():
     assert "assets/app-icon.png" in spec
     assert 'AppUserModelID: "OK7PS.AntennaPatternLab"' in script
     assert 'IconFilename: "{app}\\AntennaPatternLab.ico"' in script
+
+
+def test_release_workflow_uses_notes_for_the_project_version():
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    assert '--notes-file "docs\\RELEASE_NOTES_$version.md"' in workflow
+    assert "RELEASE_NOTES_0.35.0.md" not in workflow
