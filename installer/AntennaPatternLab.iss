@@ -1,6 +1,6 @@
 #define MyAppName "Antenna Pattern Lab"
 #ifndef MyAppVersion
-#define MyAppVersion "0.36.1"
+#define MyAppVersion "0.37.0"
 #endif
 #define MyAppPublisher "OK7PS"
 #define MyAppExeName "AntennaPatternLab.exe"

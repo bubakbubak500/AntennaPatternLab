@@ -72,6 +72,28 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [x] možnost tooltip připnout kliknutím, aby šel údaj pohodlně opsat nebo porovnat,
 - [x] přístupná varianta stejné informace přes klávesnici a tabulkový přehled.
 
+## UX milník 0.37 — technické měřicí pracoviště
+
+- [x] provozní hlavička oddělující kontext měření, stav sběru a jedinou dominantní akci Start/Stop,
+- [x] explicitní stavy sběru zastaveno/připojování/běží/zastavování/selhání,
+- [x] kompaktní metriky oddělené od stavů externích integrací,
+- [x] sjednocená lišta analytických filtrů,
+- [x] uživatelsky nastavitelný a perzistentní poměr graf/reporty s bezpečným resetem rozložení,
+- [x] větší polární graf se sémantickými barvami a kontrolovanými okraji pro světlý i tmavý motiv,
+- [x] responzivní přehled reportů s řazením, technickým formátováním, tooltipy, detailem výběru a vysvětlujícím prázdným stavem,
+- [x] kompaktní 36sektorová matice kvality s textovým stavem a inspektorem vybraného sektoru,
+- [x] stavový řádek omezený na PSK Reporter, WSJT-X, Hamlib, rotátor a závažná upozornění,
+- [x] přístupné názvy a popisy, vazby label–control, klávesnicové pořadí a nebarevné rozlišení stavů,
+- [x] vizuální ověření Classic/Monitor Light/Monitor Dark, CZE/ENG, 1180×720 až 1920×1080 a škálování 125–200 %,
+- [x] sjednocení reprezentativních dialogů Vzhled, Komunikace, Profily antén a První spuštění.
+
+### Následná práce po 0.37
+
+- [ ] rozšířit sjednocená pravidla dialogů na kampaně, A/B porovnání, pokrytí a mapu po doplnění charakterizačních testů,
+- [ ] oddělit vlastnictví Matplotlib grafu z `MainWindow` do samostatného panelu při nejbližší větší změně grafů,
+- [ ] provést nativní Windows test s odečítačem obrazovky a přechodem okna mezi monitory s rozdílným DPI,
+- [ ] znovu vyhodnotit přechod reportů z `QTableWidget` na modelový `QTableView` pouze tehdy, pokud měření ukáže problém s výkonem nebo údržbou.
+
 ## Milník 4 — A/B experimenty
 
 - [x] protokol a časovač řízeného střídání konfigurací A/B s potvrzením fyzické změny,

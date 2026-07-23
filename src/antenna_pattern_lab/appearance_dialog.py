@@ -19,6 +19,8 @@ class AppearanceDialog(QDialog):
         self.setWindowTitle("Vzhled aplikace" if czech else "Application appearance")
         self.setMinimumWidth(420)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
         intro = QLabel(
             "Původní vzhled zůstává dostupný. Monitor nabízí kompaktní technický motiv."
             if czech
@@ -27,6 +29,9 @@ class AppearanceDialog(QDialog):
         intro.setWordWrap(True)
         layout.addWidget(intro)
         form = QFormLayout()
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(8)
         self.design_style = QComboBox()
         self.design_style.addItem(
             "Původní (Classic)" if czech else "Original (Classic)",
@@ -54,6 +59,11 @@ class AppearanceDialog(QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        save_button = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_button.setObjectName("primaryAction")
+        save_button.setDefault(True)
+        self.design_style.setAccessibleName("Vzhled" if czech else "Design")
+        self.theme.setAccessibleName("Motiv Monitoru" if czech else "Monitor theme")
         layout.addWidget(buttons)
         self.design_style.currentIndexChanged.connect(
             self._update_theme_availability

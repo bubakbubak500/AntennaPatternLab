@@ -126,7 +126,12 @@ class AntennaProfileDialog(QDialog):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
         form = QFormLayout()
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(8)
         self.form = form
         self.field_labels: dict[str, QLabel] = {}
         self.profiles = QComboBox()
@@ -170,6 +175,9 @@ class AntennaProfileDialog(QDialog):
         self.save_button = QPushButton(self.text["save"])
         self.archive_button = QPushButton(self.text["archive"])
         self.close_button = QPushButton(self.text["close"])
+        self.save_button.setObjectName("primaryAction")
+        self.save_button.setDefault(True)
+        self.archive_button.setProperty("statusRole", "danger")
         buttons.addWidget(self.new_button)
         buttons.addWidget(self.save_button)
         buttons.addWidget(self.archive_button)
@@ -178,6 +186,7 @@ class AntennaProfileDialog(QDialog):
         layout.addLayout(buttons)
         self.profiles.currentIndexChanged.connect(self._profile_selected)
         self.antenna_type.currentIndexChanged.connect(self._type_changed)
+        self.name.textChanged.connect(self.name.setToolTip)
         self.new_button.clicked.connect(self.new_profile)
         self.save_button.clicked.connect(self.save_profile)
         self.archive_button.clicked.connect(self.archive_profile)
@@ -185,6 +194,8 @@ class AntennaProfileDialog(QDialog):
 
     def _add_row(self, key: str, text: str, widget) -> None:
         label = QLabel(text)
+        label.setBuddy(widget)
+        widget.setAccessibleName(text)
         self.field_labels[key] = label
         self.form.addRow(label, widget)
 
@@ -248,6 +259,7 @@ class AntennaProfileDialog(QDialog):
         profile = self.repository.get_antenna_profile(profile_id)
         self.profile_id = profile.id
         self.name.setText(profile.name)
+        self.name.setCursorPosition(0)
         type_index = self.antenna_type.findData(normalize_antenna_type(profile.antenna_type))
         self.antenna_type.setCurrentIndex(max(0, type_index))
         self._set_nullable(self.apex_height, profile.apex_height_m)

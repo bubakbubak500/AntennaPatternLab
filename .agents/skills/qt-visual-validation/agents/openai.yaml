@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qt Visual Validation"
+  short_description: "Validate rendered Qt interfaces across key states"
+  default_prompt: "Use $qt-visual-validation to inspect and validate this rendered PySide6 interface."

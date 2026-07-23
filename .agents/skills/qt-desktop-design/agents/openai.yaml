@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qt Desktop Design"
+  short_description: "Design polished PySide6 technical workstations"
+  default_prompt: "Use $qt-desktop-design to improve this PySide6 desktop interface."

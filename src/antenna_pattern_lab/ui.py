@@ -11,7 +11,7 @@ import time
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtCore import QObject, QSettings, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtGui import QAction, QActionGroup, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QFrame,
     QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QStackedWidget,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -91,6 +93,24 @@ from .theme import (
     current_tokens,
     monospace_font,
     semantic_style,
+)
+from .design_system import EmptyState, StatusIndicator, repolish
+from .ui_components import (
+    AnalysisToolbar,
+    IntegrationStatusBar,
+    MetricStrip,
+    OperationalHeader,
+    ReportExplorerPanel,
+    SectorQualityPanel,
+)
+from .ui_formatting import (
+    TechnicalTableItem,
+    compact_source,
+    format_bearing,
+    format_distance_km,
+    format_frequency_mhz,
+    format_signed_snr,
+    format_utc_timestamp,
 )
 from .update_dialog import UpdateDialog
 from .updates import DEFAULT_RELEASE_MANIFEST_URL, check_for_update
@@ -320,6 +340,41 @@ TRANSLATIONS = {
         "exposure_hover": "Detekce: {detections}/{opportunities} ({rate})\nAktivních RX: {receivers}\n95% Wilsonův interval: {confidence}",
         "summary": "{spots} použitelných reportů · {receivers} RX",
         "quality_summary": "{good}/{covered} sektorů s dobrou kvalitou",
+        "collection_section": "SBĚR",
+        "collection_states": {
+            "stopped": "○ Zastaveno",
+            "connecting": "◐ Připojuji",
+            "running": "● Probíhá",
+            "stopping": "◐ Zastavuji",
+            "failed": "◆ Chyba sběru",
+        },
+        "collection_details": {
+            "stopped": "Připraveno k bezpečnému spuštění.",
+            "connecting": "Navazuji spojení s PSK Reporterem.",
+            "running": "Přijímám a ukládám reporty.",
+            "stopping": "Dokončuji sběr a ukládám stav.",
+            "failed": "Sběr se nepodařilo spustit. Opravte nastavení a zkuste to znovu.",
+        },
+        "metrics": {
+            "reports": "Reporty",
+            "receivers": "Přijímače",
+            "quality": "Kvalitní sektory",
+            "tx": "TX relace",
+            "range": "Max. dosah",
+            "period": "Období",
+        },
+        "reports_title": "Příchozí reporty",
+        "no_reports_title": "Zatím žádné reporty",
+        "no_reports_detail": "Spusťte živý sběr, načtěte historii, importujte data nebo použijte demo.",
+        "no_filtered_title": "Filtry nevracejí žádná data",
+        "no_filtered_detail": "Změňte čas, vzdálenost, sluneční období nebo zdroj dat.",
+        "no_chart_title": "Diagram čeká na data",
+        "no_chart_detail": "Spusťte sběr, načtěte historii, importujte data nebo přidejte demo.",
+        "sector_quality_title": "Kvalita pokrytí sektorů",
+        "sector_detail": "{start:.0f}–{end:.0f}° · {quality} · {count} reportů · {receivers} RX · max {distance}",
+        "report_detail": "{time} UTC · {call} {grid} · SNR {snr} dB · {distance} km · {bearing} · {frequency} MHz · {source}",
+        "reset_layout": "Obnovit rozložení",
+        "language_menu": "Jazyk",
         "new_spot": "Nový report: {call} · {snr:+d} dB",
         "demo_added": "Přidáno {count} demo reportů.",
         "import_title": "Import spotů",
@@ -567,6 +622,41 @@ TRANSLATIONS = {
         "exposure_hover": "Detections: {detections}/{opportunities} ({rate})\nActive RX: {receivers}\n95% Wilson interval: {confidence}",
         "summary": "{spots} usable reports · {receivers} RX",
         "quality_summary": "{good}/{covered} sectors with good quality",
+        "collection_section": "COLLECTION",
+        "collection_states": {
+            "stopped": "○ Stopped",
+            "connecting": "◐ Connecting",
+            "running": "● Running",
+            "stopping": "◐ Stopping",
+            "failed": "◆ Collection failed",
+        },
+        "collection_details": {
+            "stopped": "Ready to start safely.",
+            "connecting": "Opening the PSK Reporter connection.",
+            "running": "Receiving and storing reports.",
+            "stopping": "Finishing collection and saving state.",
+            "failed": "Collection could not start. Correct the settings and try again.",
+        },
+        "metrics": {
+            "reports": "Reports",
+            "receivers": "Receivers",
+            "quality": "Good sectors",
+            "tx": "TX sessions",
+            "range": "Max range",
+            "period": "Period",
+        },
+        "reports_title": "Incoming reports",
+        "no_reports_title": "No reports yet",
+        "no_reports_detail": "Start live collection, load history, import data, or add demo data.",
+        "no_filtered_title": "No data matches the filters",
+        "no_filtered_detail": "Change the time, distance, solar-period, or source filter.",
+        "no_chart_title": "The pattern is waiting for data",
+        "no_chart_detail": "Start collection, load history, import data, or add demo data.",
+        "sector_quality_title": "Sector coverage quality",
+        "sector_detail": "{start:.0f}–{end:.0f}° · {quality} · {count} reports · {receivers} RX · max {distance}",
+        "report_detail": "{time} UTC · {call} {grid} · SNR {snr} dB · {distance} km · {bearing} · {frequency} MHz · {source}",
+        "reset_layout": "Reset layout",
+        "language_menu": "Language",
         "new_spot": "New report: {call} · {snr:+d} dB",
         "demo_added": "Added {count} demo reports.",
         "import_title": "Import spots",
@@ -669,6 +759,7 @@ class MainWindow(QMainWindow):
             self.bridge.rotator_connection.emit,
         )
         self._collecting = False
+        self._collection_ui_state = "stopped"
         self._connection_state = "disconnected"
         self._spot_map_dialog: SpotMapDialog | None = None
         saved_language = str(self.settings.value("language", "CZE"))
@@ -676,9 +767,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Antenna Pattern Lab · FT8 / WSPR")
         self.setWindowIcon(QApplication.instance().windowIcon())
         self.resize(1180, 760)
+        self.setMinimumSize(1100, 680)
         self._build_ui()
         self.theme_controller.theme_changed.connect(self._theme_changed)
         self._connect_signals()
+        self._configure_tab_order()
         self.wsjtx_listener.start()
         if bool(int(self.settings.value("hamlib_enabled", 0))):
             self.hamlib_monitor.start()
@@ -693,50 +786,40 @@ class MainWindow(QMainWindow):
         root = QWidget()
         root.setObjectName("AppShell")
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(6)
         self._root_layout = layout
 
-        title = QLabel("ANTENNA PATTERN LAB")
-        title.setObjectName("PanelHeader")
-        title.setStyleSheet(
-            "font-size: 20px; font-weight: 700; letter-spacing: 2px;"
-        )
-        self._title = title
+        # Kept as compatibility attributes for existing translation/theme code;
+        # the native title bar already carries the product name.
+        self._title = QLabel()
         self.subtitle = QLabel()
-        layout.addWidget(title)
 
-        controls = QFrame()
-        controls.setObjectName("primaryControls")
-        controls.setFrameShape(QFrame.Shape.StyledPanel)
-        controls_layout = QGridLayout(controls)
-        controls_layout.setContentsMargins(12, 8, 12, 8)
-        controls_layout.setHorizontalSpacing(8)
-        controls_layout.setVerticalSpacing(7)
         self.callsign = QLineEdit(str(self.settings.value("callsign", "OK7PS")))
-        self.callsign.setMaximumWidth(150)
+        self.callsign.setMaximumWidth(145)
         self.tx_grid = QLineEdit(str(self.settings.value("tx_grid", "JN79")))
-        self.tx_grid.setMaximumWidth(110)
+        self.tx_grid.setMaximumWidth(105)
         self.band = QComboBox()
         self.band.addItems(["20m", "40m", "15m", "10m", "80m", "30m", "17m", "12m", "+"])
         self.band.setCurrentText(str(self.settings.value("band", "20m")))
-        self.band.setMaximumWidth(95)
+        self.band.setMaximumWidth(90)
         self.mode = QComboBox()
         self.mode.addItems(["FT8", "WSPR"])
         self.mode.setCurrentText(str(self.settings.value("mode", "FT8")))
-        self.mode.setMaximumWidth(95)
+        self.mode.setMaximumWidth(90)
         self.language = QComboBox()
         self.language.addItems(["CZE", "ENG"])
         self.language.setCurrentText(self.language_code if self.language_code in TRANSLATIONS else "CZE")
-        self.language.setMaximumWidth(90)
+        self.language.hide()
         self.callsign_label = QLabel()
         self.tx_grid_label = QLabel()
         self.band_label = QLabel()
         self.mode_label = QLabel()
         self.language_label = QLabel()
+        self.language_label.hide()
 
-        # Background communication controls stay as the single runtime source
-        # of truth, but are edited through the Settings dialog instead of
-        # occupying the dashboard.
+        # Runtime communication controls remain the source of truth, but are
+        # edited in the Communication dialog rather than shown on the main UI.
         self.wsjtx_port = QSpinBox()
         self.wsjtx_port.setRange(1024, 65535)
         self.wsjtx_port.setValue(self.wsjtx_listener.port)
@@ -772,8 +855,6 @@ class MainWindow(QMainWindow):
         self.rx_activity_label = QLabel()
         self._reload_antenna_profiles()
 
-        self.live_button = QPushButton()
-        self.live_button.setObjectName("primaryAction")
         self.demo_button = QPushButton()
         self.import_button = QPushButton()
         self.export_button = QPushButton()
@@ -783,56 +864,55 @@ class MainWindow(QMainWindow):
         saved_history_hours = int(self.settings.value("history_hours", 6))
         history_index = self.history_hours.findData(saved_history_hours)
         self.history_hours.setCurrentIndex(max(0, history_index))
-        self.history_hours.setFixedWidth(68)
+        self.history_hours.setMaximumWidth(72)
         self.history_button = QPushButton()
         self.clear_button = QPushButton()
         self.clear_button.setProperty("buttonRole", "danger")
 
-        controls_layout.addWidget(self.callsign_label, 0, 0)
-        controls_layout.addWidget(self.callsign, 0, 1)
-        controls_layout.addWidget(self.tx_grid_label, 0, 2)
-        controls_layout.addWidget(self.tx_grid, 0, 3)
-        controls_layout.addWidget(self.band_label, 0, 4)
-        controls_layout.addWidget(self.band, 0, 5)
-        controls_layout.addWidget(self.mode_label, 0, 6)
-        controls_layout.addWidget(self.mode, 0, 7)
-        controls_layout.addWidget(self.language_label, 0, 8)
-        controls_layout.addWidget(self.language, 0, 9)
-        controls_layout.addWidget(self.antenna_profile_label, 1, 0)
-        controls_layout.addWidget(self.antenna_profile, 1, 1, 1, 3)
-        controls_layout.addWidget(self.live_button, 1, 4, 1, 2)
-        controls_layout.addWidget(self.history_hours, 1, 6)
-        controls_layout.addWidget(self.history_button, 1, 7, 1, 3)
-        controls_layout.setColumnStretch(3, 1)
-        controls.setMaximumHeight(105)
-        layout.addWidget(controls)
+        self.operational_header = OperationalHeader()
+        self.operational_header.setAccessibleName("Measurement context and collection")
+        self.operational_header.add_context(self.callsign_label, self.callsign, 0, 0)
+        self.operational_header.add_context(self.tx_grid_label, self.tx_grid, 0, 2)
+        self.operational_header.add_context(self.band_label, self.band, 0, 4)
+        self.operational_header.add_context(self.mode_label, self.mode, 0, 6)
+        self.operational_header.add_context(
+            self.antenna_profile_label, self.antenna_profile, 1, 0, 3
+        )
+        self.campaign_indicator = QLabel()
+        self.campaign_indicator.setObjectName("ContextValue")
+        self.campaign_indicator.setWordWrap(False)
+        self.operational_header.context_layout.addWidget(
+            self.campaign_indicator, 1, 4, 1, 2
+        )
+        self.operational_header.context_layout.addWidget(self.history_hours, 1, 6)
+        self.operational_header.context_layout.addWidget(self.history_button, 1, 7)
+        self.live_button = self.operational_header.collection.button
+        layout.addWidget(self.operational_header)
 
-        chart_panel = QWidget()
-        chart_panel.setObjectName("DataPanel")
-        chart_layout = QVBoxLayout(chart_panel)
-        chart_layout.setContentsMargins(0, 0, 0, 0)
-        chart_controls = QHBoxLayout()
+        self.metric_strip = MetricStrip()
+        self.metric_strip.setAccessibleName("Analysis metrics")
+        layout.addWidget(self.metric_strip)
+
+        self.analysis_toolbar = AnalysisToolbar()
+        self.analysis_toolbar.setAccessibleName("Analysis filters")
         self.graph_view_label = QLabel()
         self.graph_view = QComboBox()
         for code in ("snr", "normalized", "detrended", "receiver", "control", "count", "distance", "time", "map", "exposure", "model", "nec"):
             self.graph_view.addItem("", code)
         saved_graph = str(self.settings.value("graph_view", "snr"))
         self.graph_view.setCurrentIndex(max(0, self.graph_view.findData(saved_graph)))
+        self.graph_view.setMinimumContentsLength(18)
         self.sector_width_label = QLabel()
         self.sector_width = QComboBox()
         for width in (10, 15, 30, 45, 60, 90):
             self.sector_width.addItem(f"{width}°", width)
         saved_width = int(self.settings.value("sector_width", 10))
         self.sector_width.setCurrentIndex(max(0, self.sector_width.findData(saved_width)))
-        self.graph_info = QLabel("ⓘ")
-        self.graph_info.setProperty("statusRole", "info")
-        chart_controls.addWidget(self.graph_view_label)
-        chart_controls.addWidget(self.graph_view, 1)
-        chart_controls.addWidget(self.sector_width_label)
-        chart_controls.addWidget(self.sector_width)
-        chart_controls.addWidget(self.graph_info)
-        chart_layout.addLayout(chart_controls)
-        filter_controls = QHBoxLayout()
+        self.graph_info = QPushButton("i")
+        self.graph_info.setObjectName("graphInfo")
+        self.graph_info.setFlat(True)
+        self.graph_info.setMaximumWidth(32)
+
         self.time_filter_label = QLabel()
         self.time_filter = QComboBox()
         for code, hours in (("all", None), ("1", 1), ("6", 6), ("24", 24), ("168", 168)):
@@ -846,89 +926,112 @@ class MainWindow(QMainWindow):
         self.distance_filter = QComboBox()
         for code in ("all", "near", "mid", "dx", "ultra"):
             self.distance_filter.addItem("", code)
-        saved_distance_filter = str(self.settings.value("distance_filter", "all"))
         self.distance_filter.setCurrentIndex(
-            max(0, self.distance_filter.findData(saved_distance_filter))
+            max(0, self.distance_filter.findData(str(self.settings.value("distance_filter", "all"))))
         )
         self.period_filter_label = QLabel()
         self.period_filter = QComboBox()
         for code in ("all", "day", "night"):
             self.period_filter.addItem("", code)
-        saved_period_filter = str(self.settings.value("period_filter", "all"))
         self.period_filter.setCurrentIndex(
-            max(0, self.period_filter.findData(saved_period_filter))
+            max(0, self.period_filter.findData(str(self.settings.value("period_filter", "all"))))
         )
         self.source_filter_label = QLabel()
         self.source_filter = QComboBox()
         for code in ("all", "pskreporter", "adif"):
             self.source_filter.addItem("", code)
-        saved_source_filter = str(self.settings.value("source_filter", "all"))
         self.source_filter.setCurrentIndex(
-            max(0, self.source_filter.findData(saved_source_filter))
+            max(0, self.source_filter.findData(str(self.settings.value("source_filter", "all"))))
         )
-        filter_controls.addWidget(self.time_filter_label)
-        filter_controls.addWidget(self.time_filter)
-        filter_controls.addSpacing(12)
-        filter_controls.addWidget(self.distance_filter_label)
-        filter_controls.addWidget(self.distance_filter)
-        filter_controls.addSpacing(12)
-        filter_controls.addWidget(self.period_filter_label)
-        filter_controls.addWidget(self.period_filter)
-        filter_controls.addSpacing(12)
-        filter_controls.addWidget(self.source_filter_label)
-        filter_controls.addWidget(self.source_filter)
-        filter_controls.addStretch()
-        chart_layout.addLayout(filter_controls)
+
+        self.analysis_toolbar.add_control(self.graph_view_label, self.graph_view, 1)
+        self.analysis_toolbar.add_control(self.sector_width_label, self.sector_width)
+        self.analysis_toolbar.layout.addWidget(self.graph_info)
+        self.analysis_toolbar.add_gap()
+        self.analysis_toolbar.add_control(self.time_filter_label, self.time_filter)
+        self.analysis_toolbar.add_control(self.distance_filter_label, self.distance_filter)
+        self.analysis_toolbar.add_control(self.period_filter_label, self.period_filter)
+        self.analysis_toolbar.add_control(self.source_filter_label, self.source_filter)
+        self.analysis_toolbar.finish()
+        layout.addWidget(self.analysis_toolbar)
+
+        chart_panel = QFrame()
+        chart_panel.setObjectName("DataPanel")
+        chart_layout = QVBoxLayout(chart_panel)
+        chart_layout.setContentsMargins(4, 4, 4, 4)
         self.figure = Figure(
             figsize=(6, 5), facecolor=current_tokens().panel_background
         )
         self.canvas = FigureCanvasQTAgg(self.figure)
+        self.canvas.setAccessibleName("Primary analysis chart")
         self._graph_hover_data = []
         self._plot_annotation = None
         self._plot_pinned = False
         self.canvas.mpl_connect("motion_notify_event", self._on_graph_hover)
         self.canvas.mpl_connect("button_press_event", self._on_graph_click)
-        chart_layout.addWidget(self.canvas, 1)
+        self.chart_empty = EmptyState()
+        self.chart_stack = QStackedWidget()
+        self.chart_stack.addWidget(self.canvas)
+        self.chart_stack.addWidget(self.chart_empty)
+        chart_layout.addWidget(self.chart_stack, 1)
         self.graph_details = QTableWidget(0, 5)
         self.graph_details.setObjectName("DataTable")
         self.graph_details.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.graph_details.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.graph_details.horizontalHeader().setStretchLastSection(True)
-        self.graph_details.setMaximumHeight(155)
-        chart_layout.addWidget(self.graph_details)
+        self.graph_details.hide()
+
         self.table = QTableWidget(0, 8)
         self.table.setObjectName("DataTable")
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(chart_panel)
-        splitter.addWidget(self.table)
-        splitter.setSizes([620, 540])
-        layout.addWidget(splitter, 1)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSortingEnabled(True)
+        self.table.verticalHeader().setDefaultSectionSize(current_tokens().table_row_height)
+        header = self.table.horizontalHeader()
+        for column in range(7):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+        self.report_panel = ReportExplorerPanel(self.table)
+        self.table.itemSelectionChanged.connect(self._report_selection_changed)
 
-        status_row = QHBoxLayout()
-        self.connection_indicator = QLabel()
-        self.connection_indicator.setMinimumWidth(175)
-        self.wsjtx_indicator = QLabel()
-        self.wsjtx_indicator.setMinimumWidth(145)
-        self.hamlib_indicator = QLabel()
-        self.hamlib_indicator.setMinimumWidth(145)
-        self.rotator_indicator = QLabel()
-        self.rotator_indicator.setMinimumWidth(145)
-        self.campaign_indicator = QLabel()
-        self.campaign_indicator.setMinimumWidth(150)
-        self.status = QLabel()
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.setObjectName("MainAnalysisSplitter")
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.addWidget(chart_panel)
+        self.main_splitter.addWidget(self.report_panel)
+        self.main_splitter.setStretchFactor(0, 65)
+        self.main_splitter.setStretchFactor(1, 35)
+        saved_splitter = self.settings.value("ui/main_splitter_state")
+        restored = bool(saved_splitter and self.main_splitter.restoreState(saved_splitter))
+        if not restored:
+            self.main_splitter.setSizes([760, 420])
+        layout.addWidget(self.main_splitter, 1)
+
+        self.sector_quality_panel = SectorQualityPanel()
+        layout.addWidget(self.sector_quality_panel)
+
+        self.integration_bar = IntegrationStatusBar()
+        self.connection_indicator = StatusIndicator()
+        self.wsjtx_indicator = StatusIndicator()
+        self.hamlib_indicator = StatusIndicator()
+        self.rotator_indicator = StatusIndicator()
+        for indicator in (
+            self.connection_indicator,
+            self.wsjtx_indicator,
+            self.hamlib_indicator,
+            self.rotator_indicator,
+        ):
+            self.integration_bar.add_indicator(indicator)
+        self.integration_bar.finish()
+        self.status = self.integration_bar.warning
+        layout.addWidget(self.integration_bar)
+
+        # Compatibility label retained for tests and integrations; metrics now
+        # render through MetricStrip rather than the bottom status row.
         self.summary = QLabel()
-        self.summary.setAlignment(Qt.AlignmentFlag.AlignRight)
-        status_row.addWidget(self.connection_indicator)
-        status_row.addWidget(self.wsjtx_indicator)
-        status_row.addWidget(self.hamlib_indicator)
-        status_row.addWidget(self.rotator_indicator)
-        status_row.addWidget(self.campaign_indicator)
-        status_row.addWidget(self.status, 1)
-        status_row.addWidget(self.summary)
-        layout.addLayout(status_row)
+        self.summary.hide()
+
         self.setCentralWidget(root)
         self._build_menus()
         self._apply_theme()
@@ -1012,6 +1115,23 @@ class MainWindow(QMainWindow):
         self.appearance_action = QAction(self)
         self.appearance_action.triggered.connect(self._open_appearance_settings)
         self.settings_menu.addAction(self.appearance_action)
+        self.language_menu = self.settings_menu.addMenu("")
+        self.language_group = QActionGroup(self)
+        self.language_group.setExclusive(True)
+        self.language_actions = {}
+        for code in ("CZE", "ENG"):
+            action = QAction(code, self)
+            action.setCheckable(True)
+            action.setData(code)
+            action.triggered.connect(
+                lambda checked=False, selected=code: self.language.setCurrentText(selected)
+            )
+            self.language_group.addAction(action)
+            self.language_menu.addAction(action)
+            self.language_actions[code] = action
+        self.reset_layout_action = QAction(self)
+        self.reset_layout_action.triggered.connect(self._reset_layout)
+        self.settings_menu.addAction(self.reset_layout_action)
 
         self.diagnostics_action = QAction(self)
         self.diagnostics_action.triggered.connect(self.diagnostics_button.click)
@@ -1059,6 +1179,7 @@ class MainWindow(QMainWindow):
         self.distance_filter.currentIndexChanged.connect(self._graph_options_changed)
         self.period_filter.currentIndexChanged.connect(self._graph_options_changed)
         self.source_filter.currentIndexChanged.connect(self._graph_options_changed)
+        self.main_splitter.splitterMoved.connect(self._save_splitter_state)
         self.bridge.spot_received.connect(self._store_live_spot)
         self.bridge.connection_changed.connect(self._set_connection_state)
         self.bridge.history_completed.connect(self._history_completed)
@@ -1075,6 +1196,28 @@ class MainWindow(QMainWindow):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(3000)
         self._refresh_timer.timeout.connect(self.refresh)
+
+    def _configure_tab_order(self) -> None:
+        controls = (
+            self.callsign,
+            self.tx_grid,
+            self.band,
+            self.mode,
+            self.antenna_profile,
+            self.history_hours,
+            self.history_button,
+            self.live_button,
+            self.graph_view,
+            self.sector_width,
+            self.graph_info,
+            self.time_filter,
+            self.distance_filter,
+            self.period_filter,
+            self.source_filter,
+            self.table,
+        )
+        for current, following in zip(controls, controls[1:]):
+            QWidget.setTabOrder(current, following)
 
     def _apply_theme(self) -> None:
         tokens = self.theme_controller.tokens
@@ -1095,23 +1238,13 @@ class MainWindow(QMainWindow):
         if monitor:
             self._root_layout.setContentsMargins(12, 8, 12, 8)
             self._root_layout.setSpacing(6)
-            self._title.setStyleSheet(
-                f"font-size: {tokens.heading_font_px}px; "
-                "font-weight: 600; letter-spacing: 1px;"
-            )
-            self.live_button.setStyleSheet("font-weight: 600;")
             for widget, _font in self._classic_widget_fonts:
                 widget.setFont(monospace_font())
         else:
-            self._root_layout.setContentsMargins(16, 12, 16, 12)
-            self._root_layout.setSpacing(-1)
-            self._title.setStyleSheet(
-                "font-size: 20px; font-weight: 700; letter-spacing: 2px;"
-            )
-            self.live_button.setStyleSheet("font-weight: 700;")
+            self._root_layout.setContentsMargins(12, 8, 12, 8)
+            self._root_layout.setSpacing(6)
             for widget, font in self._classic_widget_fonts:
                 widget.setFont(font)
-        self.clear_button.setStyleSheet(semantic_style("danger"))
         self.graph_info.setStyleSheet(
             semantic_style(
                 "info",
@@ -1119,6 +1252,7 @@ class MainWindow(QMainWindow):
                 size_px=tokens.heading_font_px if monitor else 17,
             )
         )
+        self.table.verticalHeader().setDefaultSectionSize(tokens.table_row_height)
         apply_figure_theme(self.figure)
 
     def _theme_changed(self, _tokens) -> None:
@@ -1139,22 +1273,43 @@ class MainWindow(QMainWindow):
 
     def toggle_collection(self) -> None:
         if self._collecting:
+            self._set_collection_ui_state("stopping")
             self.collector.stop()
             self._collecting = False
-            self.live_button.setText(self._text("start"))
             self._refresh_timer.stop()
+            self._set_collection_ui_state("stopped")
             return
+        self._set_collection_ui_state("connecting")
         try:
             self.collector.start(
                 self.callsign.text(), self.band.currentText(), self.mode.currentText(), self._activity_fields()
             )
         except ValueError as exc:
+            self._set_collection_ui_state("failed", str(exc))
             QMessageBox.warning(self, self._text("cannot_start"), str(exc))
             return
         self._save_settings()
         self._collecting = True
-        self.live_button.setText(self._text("stop"))
+        self._set_collection_ui_state("running")
         self._refresh_timer.start()
+
+    def _set_collection_ui_state(self, state: str, detail: str = "") -> None:
+        if state not in {"stopped", "connecting", "running", "stopping", "failed"}:
+            state = "failed"
+        self._collection_ui_state = state
+        if not hasattr(self, "operational_header"):
+            return
+        action = self._text("stop") if state == "running" else self._text("start")
+        if state == "connecting":
+            action = self._text("collection_states")["connecting"]
+        elif state == "stopping":
+            action = self._text("collection_states")["stopping"]
+        self.operational_header.collection.set_collection_state(
+            state,
+            self._text("collection_states")[state],
+            detail or self._text("collection_details")[state],
+            action,
+        )
 
     def _store_live_spot(self, spot: Spot) -> None:
         if self.repository.add(spot):
@@ -1322,7 +1477,7 @@ class MainWindow(QMainWindow):
             )
         except ValueError as exc:
             self._collecting = False
-            self.live_button.setText(self._text("start"))
+            self._set_collection_ui_state("failed", str(exc))
             self._refresh_timer.stop()
             QMessageBox.warning(self, self._text("cannot_start"), str(exc))
 
@@ -1384,6 +1539,36 @@ class MainWindow(QMainWindow):
     def refresh(self) -> None:
         located = self._located_spots()
         self._draw_profile(located)
+        mode = self.graph_view.currentData() or "snr"
+        chart_requires_reports = mode not in {"model", "nec"}
+        if chart_requires_reports and not located:
+            filtered_empty = self.repository.count() > 0
+            self.chart_empty.heading.setText(
+                self._text("no_filtered_title")
+                if filtered_empty
+                else self._text("no_chart_title")
+            )
+            self.chart_empty.description.setText(
+                self._text("no_filtered_detail")
+                if filtered_empty
+                else self._text("no_chart_detail")
+            )
+            self.chart_stack.setCurrentWidget(self.chart_empty)
+            self.report_panel.set_texts(
+                self._text("reports_title"),
+                (
+                    self._text("no_filtered_title")
+                    if filtered_empty
+                    else self._text("no_reports_title")
+                ),
+                (
+                    self._text("no_filtered_detail")
+                    if filtered_empty
+                    else self._text("no_reports_detail")
+                ),
+            )
+        else:
+            self.chart_stack.setCurrentWidget(self.canvas)
         apply_figure_theme(self.figure)
         self.canvas.draw_idle()
         self._fill_table(located[:500])
@@ -1392,10 +1577,68 @@ class MainWindow(QMainWindow):
         sectors = sector_profile(located, width_deg)
         covered = sum(sector.count > 0 for sector in sectors)
         good = sum(sector.quality_label == "high" for sector in sectors)
+        tx_count = self.repository.tx_session_count()
+        maximum_distance = max(
+            (item.distance_km for item in located),
+            default=None,
+        )
         self.summary.setText(
             self._text("summary").format(spots=len(located), receivers=unique_rx)
             + f" · {self._text('quality_summary').format(good=good, covered=covered)}"
-            + f" · {self.repository.tx_session_count()} TX"
+            + f" · {tx_count} TX"
+        )
+        metric_labels = self._text("metrics")
+        self.metric_strip.set_metrics(
+            {
+                "reports": (metric_labels["reports"], str(len(located)), self._filter_context()),
+                "receivers": (metric_labels["receivers"], str(unique_rx), ""),
+                "quality": (
+                    metric_labels["quality"],
+                    f"{good}/{covered}",
+                    self._text("quality_summary").format(good=good, covered=covered),
+                ),
+                "tx": (metric_labels["tx"], str(tx_count), ""),
+                "range": (
+                    metric_labels["range"],
+                    (
+                        f"{format_distance_km(maximum_distance)} km"
+                        if maximum_distance is not None
+                        else "—"
+                    ),
+                    "",
+                ),
+                "period": (
+                    metric_labels["period"],
+                    self.time_filter.currentText(),
+                    self._filter_context(),
+                ),
+            }
+        )
+        quality_labels = self._text("quality_labels")
+        sector_details = []
+        for sector in sectors:
+            start = sector.center_deg - width_deg / 2
+            end = sector.center_deg + width_deg / 2
+            sector_details.append(
+                self._text("sector_detail").format(
+                    start=start % 360,
+                    end=end % 360,
+                    quality=quality_labels[sector.quality_label],
+                    count=sector.count,
+                    receivers=sector.unique_receivers,
+                    distance=(
+                        f"{format_distance_km(sector.max_distance_km)} km"
+                        if sector.max_distance_km is not None
+                        else "—"
+                    ),
+                )
+            )
+        self.sector_quality_panel.set_sectors(
+            sectors,
+            width_deg,
+            quality_labels,
+            self._text("quality_summary").format(good=good, covered=covered),
+            sector_details,
         )
         if hasattr(self, "campaign_indicator"):
             self._render_campaign_indicator()
@@ -1454,12 +1697,7 @@ class MainWindow(QMainWindow):
                 max(0.0, (sector.median_snr_db if sector.median_snr_db is not None else -30.0) + 30.0)
                 for sector in profile
             ]
-        quality_colors = {
-            "none": TOKENS.divider,
-            "low": TOKENS.text_muted,
-            "medium": TOKENS.accent_secondary,
-            "high": TOKENS.success,
-        }
+        quality_colors = TOKENS.confidence_levels
         bars = axis.bar(
             theta,
             radius,
@@ -1631,7 +1869,7 @@ class MainWindow(QMainWindow):
             axis.plot(
                 outline_theta,
                 outline_radius,
-                color=TOKENS.chart_series[0],
+                color=TOKENS.chart_empirical_line,
                 linewidth=2.4,
                 label=self._text("measured_outline"),
                 zorder=4,
@@ -1640,7 +1878,7 @@ class MainWindow(QMainWindow):
                 axis.fill(
                     outline_theta,
                     outline_radius,
-                    color=TOKENS.chart_series[5],
+                    color=TOKENS.chart_empirical_fill,
                     alpha=0.15,
                     zorder=2,
                 )
@@ -1659,7 +1897,7 @@ class MainWindow(QMainWindow):
             axis.plot(
                 [angle, angle],
                 [0, reference_limit],
-                color=TOKENS.warning,
+                color=TOKENS.chart_theoretical_reference,
                 linestyle="--",
                 linewidth=1.5,
                 label=self._text("profile_reference") if index == 0 else None,
@@ -1691,13 +1929,18 @@ class MainWindow(QMainWindow):
                         control_group.reason_code
                     ]
                 )
-        axis.set_title(title, color=TOKENS.text_primary, pad=20)
+        axis.set_title(title, color=TOKENS.text_primary, pad=14)
         if reference_bearings or mode in ("snr", "normalized", "detrended", "receiver", "control"):
-            legend = axis.legend(loc="lower left", bbox_to_anchor=(-0.15, -0.12), fontsize=8)
+            legend = axis.legend(
+                loc="lower left",
+                bbox_to_anchor=(-0.42, -0.02),
+                fontsize=8,
+                ncol=1,
+            )
             for text_item in legend.get_texts():
                 text_item.set_color(TOKENS.text_primary)
             legend.get_frame().set_facecolor(TOKENS.surface_1)
-        self.figure.tight_layout()
+        self.figure.subplots_adjust(left=0.08, right=0.92, top=0.92, bottom=0.10)
         self._plot_annotation = axis.annotate(
             "",
             xy=(0, 0),
@@ -2141,22 +2384,82 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def _fill_table(self, located) -> None:
+        sorting = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(located))
         for row, item in enumerate(located):
             spot = item.spot
+            source_full = self._text("source_filters").get(spot.source, spot.source)
             values = (
-                spot.observed_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M"),
-                spot.rx_call,
-                spot.rx_grid,
-                f"{spot.snr_db:+d}",
-                f"{item.distance_km:.0f}",
-                f"{item.bearing_deg:.0f}°",
-                f"{spot.frequency_hz / 1_000_000:.6f}",
-                self._text("source_filters").get(spot.source, spot.source),
+                TechnicalTableItem(
+                    format_utc_timestamp(spot.observed_at),
+                    sort_value=spot.observed_at.timestamp(),
+                    tooltip=f"{format_utc_timestamp(spot.observed_at)} UTC",
+                ),
+                TechnicalTableItem(spot.rx_call, tooltip=spot.rx_call),
+                TechnicalTableItem(spot.rx_grid, tooltip=spot.rx_grid),
+                TechnicalTableItem(
+                    format_signed_snr(spot.snr_db),
+                    sort_value=spot.snr_db,
+                    tooltip=f"{format_signed_snr(spot.snr_db)} dB",
+                    numeric=True,
+                ),
+                TechnicalTableItem(
+                    format_distance_km(item.distance_km),
+                    sort_value=item.distance_km,
+                    tooltip=f"{format_distance_km(item.distance_km)} km",
+                    numeric=True,
+                ),
+                TechnicalTableItem(
+                    format_bearing(item.bearing_deg),
+                    sort_value=item.bearing_deg,
+                    numeric=True,
+                ),
+                TechnicalTableItem(
+                    format_frequency_mhz(spot.frequency_hz),
+                    sort_value=spot.frequency_hz,
+                    tooltip=f"{format_frequency_mhz(spot.frequency_hz)} MHz",
+                    numeric=True,
+                ),
+                TechnicalTableItem(
+                    compact_source(spot.source),
+                    sort_value=source_full,
+                    tooltip=source_full,
+                ),
             )
             for column, value in enumerate(values):
-                self.table.setItem(row, column, QTableWidgetItem(value))
-        self.table.resizeColumnsToContents()
+                self.table.setItem(row, column, value)
+        self.table.setSortingEnabled(sorting)
+        self.report_panel.set_report_count(len(located))
+        if not located:
+            self.report_panel.set_selected_detail("")
+
+    def _report_selection_changed(self) -> None:
+        row = self.table.currentRow()
+        if row < 0:
+            self.report_panel.set_selected_detail("")
+            return
+        values = [
+            self.table.item(row, column).text() if self.table.item(row, column) else "—"
+            for column in range(self.table.columnCount())
+        ]
+        source = (
+            self.table.item(row, 7).toolTip()
+            if self.table.item(row, 7) is not None
+            else values[7]
+        )
+        self.report_panel.set_selected_detail(
+            self._text("report_detail").format(
+                time=values[0],
+                call=values[1],
+                grid=values[2],
+                snr=values[3],
+                distance=values[4],
+                bearing=values[5],
+                frequency=values[6],
+                source=source,
+            )
+        )
 
     def _save_settings(self) -> None:
         self.settings.setValue("callsign", self.callsign.text().strip().upper())
@@ -2173,6 +2476,18 @@ class MainWindow(QMainWindow):
         self.settings.setValue("hamlib_port", self.hamlib_port.value())
         self.settings.setValue("rotator_port", self.rotator_port.value())
 
+    def _save_splitter_state(self, *_args) -> None:
+        if hasattr(self, "main_splitter"):
+            self.settings.setValue(
+                "ui/main_splitter_state",
+                self.main_splitter.saveState(),
+            )
+
+    def _reset_layout(self) -> None:
+        self.settings.remove("ui/main_splitter_state")
+        self.main_splitter.setSizes([760, 420])
+        self._save_splitter_state()
+
     def _text(self, key: str):
         return TRANSLATIONS[self.language_code][key]
 
@@ -2188,6 +2503,7 @@ class MainWindow(QMainWindow):
             + escape(content).replace("\n", "<br>")
             + "</td></tr></table>"
         )
+        self.graph_info.setAccessibleDescription(content)
 
     def _change_language(self, language_code: str) -> None:
         self.language_code = language_code
@@ -2220,7 +2536,15 @@ class MainWindow(QMainWindow):
         self.hamlib_enabled.setToolTip(self._text("hamlib_tooltip"))
         self.rx_activity_label.setText(self._text("rx_activity"))
         self.rx_activity_enabled.setToolTip(self._text("rx_activity_tooltip"))
-        self.live_button.setText(self._text("stop" if self._collecting else "start"))
+        self.operational_header.collection.section_label.setText(
+            self._text("collection_section")
+        )
+        self.graph_info.setAccessibleName(
+            "Nápověda ke grafu" if self.language_code == "CZE" else "Chart help"
+        )
+        self._set_collection_ui_state(
+            "running" if self._collecting else self._collection_ui_state
+        )
         self.demo_button.setText(self._text("demo"))
         self.import_button.setText(self._text("import"))
         self.export_button.setText(self._text("export"))
@@ -2251,6 +2575,10 @@ class MainWindow(QMainWindow):
         self.appearance_action.setText(
             "Vzhled aplikace…" if self.language_code == "CZE" else "Appearance…"
         )
+        self.language_menu.setTitle(self._text("language_menu"))
+        for code, action in self.language_actions.items():
+            action.setChecked(code == self.language_code)
+        self.reset_layout_action.setText(self._text("reset_layout"))
         self.diagnostics_action.setText(self._text("diagnostics"))
         self.help_contents_action.setText(self._text("help_contents"))
         self.about_action.setText(self._text("about"))
@@ -2279,6 +2607,13 @@ class MainWindow(QMainWindow):
         self.sector_width.setToolTip(self._text("sector_tip"))
         self._update_graph_tooltip()
         self.graph_details.setAccessibleName(self._text("graph_details"))
+        self.table.setAccessibleName(self._text("reports_title"))
+        self.canvas.setAccessibleDescription(self._filter_context())
+        self.callsign.setAccessibleName(self._text("callsign"))
+        self.tx_grid.setAccessibleName(self._text("tx_grid"))
+        self.band.setAccessibleName(self._text("band"))
+        self.mode.setAccessibleName(self._text("mode"))
+        self.antenna_profile.setAccessibleName(self._text("antenna_profile"))
         self.graph_details.setHorizontalHeaderLabels(self._text("graph_detail_headers"))
         sector_enabled = self.graph_view.currentData() not in ("time", "map", "model", "nec")
         self.sector_width.setEnabled(sector_enabled)
@@ -2288,6 +2623,12 @@ class MainWindow(QMainWindow):
         self._render_rotator_indicator()
         self._render_campaign_indicator()
         self.table.setHorizontalHeaderLabels(self._text("headers"))
+        self.report_panel.set_texts(
+            self._text("reports_title"),
+            self._text("no_reports_title"),
+            self._text("no_reports_detail"),
+        )
+        self.sector_quality_panel.set_title(self._text("sector_quality_title"))
         self._reload_antenna_profiles(self.antenna_profile.currentData())
         if not self.status.text():
             self.status.setText(self._text("ready"))
@@ -2581,17 +2922,27 @@ class MainWindow(QMainWindow):
 
     def _set_connection_state(self, state: str, detail: str) -> None:
         self._connection_state = state if state in ("disconnected", "connecting", "connected", "error") else "error"
-        colors = {
-            "disconnected": TOKENS.text_secondary,
-            "connecting": TOKENS.warning,
-            "connected": TOKENS.success,
-            "error": TOKENS.danger_strong,
-        }
         label = self._text("connection")[self._connection_state]
-        self.connection_indicator.setText(f"● MQTT: {label}")
-        self.connection_indicator.setStyleSheet(f"color: {colors[self._connection_state]}; font-weight: 700;")
-        self.connection_indicator.setToolTip(detail)
+        semantic_state = {
+            "disconnected": "inactive",
+            "connecting": "connecting",
+            "connected": "connected",
+            "error": "error",
+        }[self._connection_state]
+        self.connection_indicator.set_indicator(
+            "PSK Reporter",
+            semantic_state,
+            detail or self._text("connection_status")[self._connection_state],
+            label,
+        )
         self.status.setText(self._text("connection_status")[self._connection_state])
+        if self._collecting:
+            if self._connection_state == "connected":
+                self._set_collection_ui_state("running")
+            elif self._connection_state == "connecting":
+                self._set_collection_ui_state("connecting")
+            elif self._connection_state == "error":
+                self._set_collection_ui_state("failed", detail)
 
     def _restart_wsjtx_listener(self) -> None:
         port = self.wsjtx_port.value()
@@ -2629,21 +2980,20 @@ class MainWindow(QMainWindow):
 
     def _render_wsjtx_indicator(self) -> None:
         state = self._wsjtx_connection_state
-        colors = {
-            "disconnected": TOKENS.text_secondary,
-            "waiting": TOKENS.warning,
-            "connected": TOKENS.success,
-            "stale": TOKENS.warning_strong,
-            "error": TOKENS.danger_strong,
-        }
         label_key = self._wsjtx_operating_state if state == "connected" and self._wsjtx_operating_state else state
         labels = self._text("wsjtx")
-        self.wsjtx_indicator.setText(f"● WSJT-X: {labels.get(label_key, labels['error'])}")
-        self.wsjtx_indicator.setStyleSheet(
-            f"color: {colors.get(state, colors['error'])}; font-weight: 700;"
-        )
-        self.wsjtx_indicator.setToolTip(
-            f"{self._text('wsjtx_tooltip')}\n{self._wsjtx_detail}".strip()
+        semantic_state = {
+            "disconnected": "inactive",
+            "waiting": "waiting",
+            "connected": "connected",
+            "stale": "warning",
+            "error": "error",
+        }.get(state, "error")
+        self.wsjtx_indicator.set_indicator(
+            "WSJT-X",
+            semantic_state,
+            f"{self._text('wsjtx_tooltip')}\n{self._wsjtx_detail}".strip(),
+            labels.get(label_key, labels["error"]),
         )
 
     def _handle_wsjtx_message(self, message: object) -> None:
@@ -2819,19 +3169,18 @@ class MainWindow(QMainWindow):
 
     def _render_hamlib_indicator(self) -> None:
         state = self._hamlib_connection_state
-        colors = {
-            "disabled": TOKENS.text_secondary,
-            "connecting": TOKENS.warning,
-            "connected": TOKENS.success,
-            "error": TOKENS.danger_strong,
-        }
         label = self._text("hamlib_states").get(state, self._text("hamlib_states")["error"])
-        self.hamlib_indicator.setText(f"● Hamlib: {label}")
-        self.hamlib_indicator.setStyleSheet(
-            f"color: {colors.get(state, colors['error'])}; font-weight: 700;"
-        )
-        self.hamlib_indicator.setToolTip(
-            f"{self._text('hamlib_tooltip')}\n{self._hamlib_detail}".strip()
+        semantic_state = {
+            "disabled": "inactive",
+            "connecting": "connecting",
+            "connected": "connected",
+            "error": "error",
+        }.get(state, "error")
+        self.hamlib_indicator.set_indicator(
+            "Hamlib",
+            semantic_state,
+            f"{self._text('hamlib_tooltip')}\n{self._hamlib_detail}".strip(),
+            label,
         )
 
     def _set_rotator_state(self, state: str, detail: str) -> None:
@@ -2909,12 +3258,6 @@ class MainWindow(QMainWindow):
 
     def _render_rotator_indicator(self) -> None:
         state = self._rotator_connection_state
-        colors = {
-            "disabled": TOKENS.text_secondary,
-            "connecting": TOKENS.warning,
-            "connected": TOKENS.success,
-            "error": TOKENS.danger_strong,
-        }
         labels = self._text("rotator_states")
         safety = self._rotator_safety
         label = labels.get(state, labels["error"])
@@ -2927,19 +3270,6 @@ class MainWindow(QMainWindow):
             f" · {self._latest_rotator_state.azimuth_deg:.0f}°"
             if state == "connected" and self._latest_rotator_state is not None
             else ""
-        )
-        self.rotator_indicator.setText(
-            f"● {self._text('rotator_name')}: {label}{position}"
-        )
-        color = (
-            TOKENS.danger_strong
-            if safety.severity == "error"
-            else TOKENS.warning_strong
-            if safety.severity == "warning"
-            else colors.get(state, colors["error"])
-        )
-        self.rotator_indicator.setStyleSheet(
-            f"color: {color}; font-weight: 700;"
         )
         alert_details = []
         if "moving_during_tx" in safety.warnings:
@@ -2954,7 +3284,21 @@ class MainWindow(QMainWindow):
                     error=safety.target_error_deg or 0.0
                 )
             )
-        self.rotator_indicator.setToolTip(
+        semantic_state = (
+            "error"
+            if safety.severity == "error"
+            else "warning"
+            if safety.severity == "warning"
+            else {
+                "disabled": "inactive",
+                "connecting": "connecting",
+                "connected": "connected",
+                "error": "error",
+            }.get(state, "error")
+        )
+        self.rotator_indicator.set_indicator(
+            self._text("rotator_name"),
+            semantic_state,
             "\n".join(
                 part
                 for part in (
@@ -2963,16 +3307,16 @@ class MainWindow(QMainWindow):
                     *alert_details,
                 )
                 if part
-            )
+            ),
+            f"{label}{position}",
         )
 
     def _render_campaign_indicator(self) -> None:
         active = self.repository.active_campaign()
         if active is None:
             self.campaign_indicator.setText(self._text("campaign_none"))
-            self.campaign_indicator.setStyleSheet(
-                f"color: {TOKENS.text_secondary}; font-weight: 700;"
-            )
+            self.campaign_indicator.setProperty("statusRole", "inactive")
+            repolish(self.campaign_indicator)
             self.campaign_indicator.setToolTip("")
             return
         located = [
@@ -2991,10 +3335,10 @@ class MainWindow(QMainWindow):
                 )
             )
         )
-        self.campaign_indicator.setStyleSheet(
-            f"color: {TOKENS.success if progress.complete else TOKENS.warning}; "
-            "font-weight: 700;"
+        self.campaign_indicator.setProperty(
+            "statusRole", "success" if progress.complete else "warning"
         )
+        repolish(self.campaign_indicator)
         self.campaign_indicator.setToolTip(
             (
                 f"{active.band} {active.mode} · "
@@ -3018,4 +3362,5 @@ class MainWindow(QMainWindow):
         self.rotator_monitor.stop()
         self.collector.stop()
         self._save_settings()
+        self._save_splitter_state()
         super().closeEvent(event)

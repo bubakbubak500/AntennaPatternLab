@@ -24,8 +24,15 @@ def test_window_renders_demo_profile(tmp_path, monkeypatch):
     assert window.figure.get_facecolor()[:3] == (1.0, 1.0, 1.0)
     assert window.file_menu.title() == "Soubor"
     assert window.settings_menu.title() == "Nastavení"
-    assert window.live_button.parentWidget().objectName() == "primaryControls"
-    assert window.live_button.parentWidget().maximumHeight() == 105
+    assert window.live_button.parentWidget().objectName() == "CollectionControl"
+    assert window.operational_header.objectName() == "OperationalHeader"
+    assert window.metric_strip.objectName() == "MetricStrip"
+    assert window.analysis_toolbar.objectName() == "AnalysisToolbar"
+    assert window.main_splitter.objectName() == "MainAnalysisSplitter"
+    assert window.report_panel.objectName() == "ReportExplorer"
+    assert window.sector_quality_panel.objectName() == "SectorQualityPanel"
+    assert window.integration_bar.objectName() == "IntegrationStatusBar"
+    assert window.live_button.accessibleName()
     window.language.setCurrentText("CZE")
     window.band.setCurrentText("40m")
     window.add_demo_data()
@@ -34,7 +41,8 @@ def test_window_renders_demo_profile(tmp_path, monkeypatch):
     assert window.table.rowCount() == 100
     assert {spot.band for spot in window.repository.list_spots()} == {"40m"}
     assert "100 použitelných" in window.summary.text()
-    assert "MQTT: Odpojeno" in window.connection_indicator.text()
+    assert "PSK Reporter: Odpojeno" in window.connection_indicator.text()
+    assert window.connection_indicator.property("statusRole") == "inactive"
     assert window.spot_map_action.text() == "Mapa spotů…"
     assert window.campaigns_action.text() == "Měřicí kampaně…"
     assert window.coverage_action.text() == "Pokrytí měření…"
@@ -179,7 +187,7 @@ def test_window_renders_demo_profile(tmp_path, monkeypatch):
     assert window.repository.tx_session_profile_id(session_id) == profile.id
     window._handle_rotator_state(RotatorState(40.0, 3.0))
     assert "MOVING DURING TX" in window.rotator_indicator.text()
-    assert "#cf222e" in window.rotator_indicator.styleSheet()
+    assert window.rotator_indicator.property("statusRole") == "danger"
     window._handle_wsjtx_message(replace(tx_status, transmitting=False))
     assert window.repository.tx_session_count() == 1
     session = window.repository.list_tx_sessions()[0]

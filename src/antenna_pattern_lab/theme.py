@@ -53,17 +53,142 @@ class ThemeTokens:
     map_water: str
     map_land: str
     map_route: str
-    spacing_1: int = 2
-    spacing_2: int = 4
-    spacing_3: int = 6
-    spacing_4: int = 8
-    spacing_5: int = 12
+    spacing_1: int = 4
+    spacing_2: int = 8
+    spacing_3: int = 12
+    spacing_4: int = 16
+    spacing_5: int = 24
     radius_small: int = 2
     radius_medium: int = 4
     ui_font_px: int = 12
     heading_font_px: int = 14
     metadata_font_px: int = 10
     transition_ms: int = 140
+
+    @property
+    def workspace_background(self) -> str:
+        return self.surface_2
+
+    @property
+    def panel_surface(self) -> str:
+        return self.panel_background
+
+    @property
+    def raised_surface(self) -> str:
+        return self.surface_1
+
+    @property
+    def input_surface(self) -> str:
+        return self.surface_2
+
+    @property
+    def selected_surface(self) -> str:
+        return self.selected
+
+    @property
+    def hover_surface(self) -> str:
+        return self.hovered
+
+    @property
+    def border_subtle(self) -> str:
+        return self.panel_border
+
+    @property
+    def border_strong(self) -> str:
+        return self.divider
+
+    @property
+    def border_focus(self) -> str:
+        return self.focused
+
+    @property
+    def text_disabled(self) -> str:
+        return self.disabled
+
+    @property
+    def text_technical(self) -> str:
+        return self.text_primary
+
+    @property
+    def accent_pressed(self) -> str:
+        return self.accent_secondary
+
+    @property
+    def inactive(self) -> str:
+        return self.text_secondary
+
+    @property
+    def selection(self) -> str:
+        return self.selected
+
+    @property
+    def focus(self) -> str:
+        return self.focused
+
+    @property
+    def chart_background(self) -> str:
+        return self.panel_background
+
+    @property
+    def chart_axis(self) -> str:
+        return self.panel_border
+
+    @property
+    def chart_text(self) -> str:
+        return self.chart_labels
+
+    @property
+    def chart_empirical_line(self) -> str:
+        return self.chart_series[0]
+
+    @property
+    def chart_empirical_fill(self) -> str:
+        return self.chart_series[5]
+
+    @property
+    def chart_theoretical_reference(self) -> str:
+        return self.warning
+
+    @property
+    def chart_missing(self) -> str:
+        return self.divider
+
+    @property
+    def chart_selected_sector(self) -> str:
+        return self.accent
+
+    @property
+    def confidence_levels(self) -> dict[str, str]:
+        return {
+            "none": self.divider,
+            "low": self.text_muted,
+            "medium": self.accent_secondary,
+            "high": self.success,
+        }
+
+    @property
+    def control_height(self) -> int:
+        return 30
+
+    @property
+    def primary_control_height(self) -> int:
+        return 34
+
+    @property
+    def panel_padding(self) -> int:
+        return 16
+
+    @property
+    def table_row_height(self) -> int:
+        return 28
+
+    @property
+    def header_height(self) -> int:
+        return 28
+
+    @property
+    def splitter_width(self) -> int:
+        return 5
 
 
 CLASSIC_TOKENS = ThemeTokens(
@@ -283,7 +408,10 @@ QMenu {{
 }}
 QWidget#AppShell, QWidget#TopToolbar, QWidget#SideNavigation,
 QWidget#DataPanel, QWidget#MetricCard, QWidget#PropertyGrid,
-QWidget#LogViewer, QWidget#EmptyState, QWidget#primaryControls {{
+QWidget#LogViewer, QWidget#EmptyState, QWidget#primaryControls,
+QWidget#OperationalHeader, QWidget#MetricStrip, QWidget#AnalysisToolbar,
+QWidget#ReportExplorer, QWidget#SectorQualityPanel,
+QWidget#IntegrationStatusBar {{
     background: {tokens.panel_background};
     border: 1px solid {tokens.panel_border};
     border-radius: {tokens.radius_medium}px;
@@ -303,11 +431,22 @@ QLabel#Metadata {{
     color: {tokens.text_secondary};
     font-size: {tokens.metadata_font_px}px;
 }}
+QLabel#ContextValue, QLabel#MetricValue {{
+    color: {tokens.text_primary};
+    font-weight: 600;
+}}
+QLabel#MetricLabel {{
+    color: {tokens.text_secondary};
+    font-size: {tokens.metadata_font_px}px;
+}}
 QLabel[statusRole="success"] {{ color: {tokens.success}; font-weight: 600; }}
 QLabel[statusRole="warning"] {{ color: {tokens.warning}; font-weight: 600; }}
 QLabel[statusRole="danger"] {{ color: {tokens.danger}; font-weight: 600; }}
 QLabel[statusRole="info"] {{ color: {tokens.info}; font-weight: 600; }}
 QLabel[statusRole="muted"] {{ color: {tokens.text_muted}; }}
+QLabel[statusRole="inactive"], QLabel[statusRole="waiting"] {{
+    color: {tokens.inactive};
+}}
 QPushButton, QToolButton, QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox,
 QDateTimeEdit, QDateEdit, QTimeEdit {{
     min-height: 22px;
@@ -339,6 +478,14 @@ QPushButton#primaryAction {{
 }}
 QPushButton#primaryAction:hover {{
     background: {tokens.accent_hover};
+}}
+QPushButton#primaryAction:pressed {{
+    background: {tokens.accent_pressed};
+}}
+QPushButton#primaryAction[collectionState="running"] {{
+    background: {tokens.danger};
+    border-color: {tokens.danger};
+    color: {tokens.text_inverse};
 }}
 QPushButton[segment="true"] {{
     border-radius: 0;
@@ -387,6 +534,35 @@ QHeaderView::section {{
     padding: {tokens.spacing_2}px {tokens.spacing_3}px;
     font-weight: 600;
 }}
+QToolButton[qualityRole] {{
+    min-height: 24px;
+    padding: 1px 3px;
+    border-radius: {tokens.radius_small}px;
+}}
+QToolButton[qualityRole="none"] {{
+    color: {tokens.text_muted};
+    background: {tokens.surface_2};
+    border-color: {tokens.divider};
+}}
+QToolButton[qualityRole="low"] {{
+    color: {tokens.text_primary};
+    background: {tokens.surface_2};
+    border-color: {tokens.text_muted};
+    border-style: dashed;
+}}
+QToolButton[qualityRole="medium"] {{
+    color: {tokens.text_primary};
+    background: {tokens.selected};
+    border-color: {tokens.accent_secondary};
+}}
+QToolButton[qualityRole="high"] {{
+    color: {tokens.text_primary};
+    background: {tokens.selected};
+    border: 2px solid {tokens.success};
+}}
+QToolButton[qualityRole]:checked {{
+    border: 2px solid {tokens.focused};
+}}
 QTabWidget::pane {{
     border: 1px solid {tokens.panel_border};
     background: {tokens.panel_background};
@@ -414,8 +590,8 @@ QGroupBox::title {{
 }}
 QSplitter::handle {{
     background: {tokens.divider};
-    width: 1px;
-    height: 1px;
+    width: {tokens.splitter_width}px;
+    height: {tokens.splitter_width}px;
 }}
 QScrollBar:vertical, QScrollBar:horizontal {{
     background: {tokens.surface_1};

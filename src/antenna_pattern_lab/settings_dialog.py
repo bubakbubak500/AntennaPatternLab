@@ -69,11 +69,15 @@ class CommunicationSettingsDialog(QDialog):
         self.setMinimumWidth(560)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
         intro = QLabel(text["intro"])
         intro.setWordWrap(True)
         layout.addWidget(intro)
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(8)
 
         self.wsjtx_host = QLineEdit(values.wsjtx_host)
         self.wsjtx_port = QSpinBox()
@@ -110,7 +114,21 @@ class CommunicationSettingsDialog(QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        save_button = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_button.setObjectName("primaryAction")
+        save_button.setDefault(True)
         layout.addWidget(buttons)
+        for widget, name in (
+            (self.wsjtx_host, text["wsjtx_host"]),
+            (self.wsjtx_port, text["wsjtx_port"]),
+            (self.wsjtx_forward, text["forward"]),
+            (self.hamlib_enabled, text["hamlib"]),
+            (self.hamlib_port, text["hamlib_port"]),
+            (self.rotator_enabled, text["rotator"]),
+            (self.rotator_port, text["rotator_port"]),
+            (self.rx_activity_enabled, text["activity"]),
+        ):
+            widget.setAccessibleName(name)
 
     def values(self) -> CommunicationSettings:
         return CommunicationSettings(

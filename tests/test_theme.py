@@ -99,6 +99,19 @@ def test_semantic_token_sets_cover_chart_and_interaction_roles():
         assert 100 <= tokens.transition_ms <= 160
         assert tokens.spacing_1 < tokens.spacing_5
         assert tokens.radius_small <= tokens.radius_medium
+        assert tokens.workspace_background
+        assert tokens.panel_surface
+        assert tokens.input_surface
+        assert tokens.border_focus == tokens.focused
+        assert tokens.accent_pressed
+        assert tokens.inactive
+        assert tokens.chart_empirical_line
+        assert tokens.chart_empirical_fill
+        assert tokens.chart_theoretical_reference
+        assert set(tokens.confidence_levels) == {"none", "low", "medium", "high"}
+        assert tokens.control_height in range(28, 33)
+        assert tokens.primary_control_height in range(32, 37)
+        assert tokens.table_row_height >= 26
 
 
 def test_appearance_dialog_only_enables_theme_for_monitor():
@@ -161,8 +174,7 @@ def test_main_window_switches_monitor_and_restores_classic(tmp_path):
     )
     classic_table_font = window.table.font()
 
-    assert window._root_layout.getContentsMargins() == (16, 12, 16, 12)
-    assert "font-size: 20px" in window._title.styleSheet()
+    assert window._root_layout.getContentsMargins() == (12, 8, 12, 8)
     assert _palette_colors(application.palette()) == native_palette
     assert application.styleSheet() == native_stylesheet
 
@@ -178,8 +190,7 @@ def test_main_window_switches_monitor_and_restores_classic(tmp_path):
         DesignStyle.CLASSIC, ThemePreference.SYSTEM
     )
     application.processEvents()
-    assert window._root_layout.getContentsMargins() == (16, 12, 16, 12)
-    assert "font-size: 20px" in window._title.styleSheet()
+    assert window._root_layout.getContentsMargins() == (12, 8, 12, 8)
     assert window.table.font() == classic_table_font
     assert _palette_colors(application.palette()) == native_palette
     assert application.styleSheet() == native_stylesheet

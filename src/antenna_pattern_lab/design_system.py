@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QEasingCurve, QPropertyAnimation, Signal
+from PySide6.QtCore import QByteArray, QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -19,6 +19,12 @@ from PySide6.QtWidgets import (
 )
 
 from .theme import ThemePreference, current_tokens, monospace_font
+
+
+def repolish(widget: QWidget) -> None:
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+    widget.update()
 
 
 class _NamedFrame(QFrame):
@@ -66,6 +72,29 @@ class MetricCard(_NamedFrame):
         layout.addWidget(self.value)
 
 
+class MetricItem(QWidget):
+    def __init__(self, label: str = "", value: str = "—", parent: QWidget | None = None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self.label = QLabel(label)
+        self.label.setObjectName("MetricLabel")
+        self.value = QLabel(value)
+        self.value.setObjectName("MetricValue")
+        self.value.setFont(monospace_font())
+        layout.addWidget(self.label)
+        layout.addWidget(self.value)
+
+    def set_metric(self, label: str, value: str, tooltip: str = "") -> None:
+        self.label.setText(label)
+        self.value.setText(value)
+        self.setToolTip(tooltip)
+        accessible = f"{label}: {value}"
+        self.setAccessibleName(accessible)
+        self.value.setAccessibleName(accessible)
+
+
 class StatusBadge(QLabel):
     def __init__(self, text: str = "", role: str = "info", parent: QWidget | None = None):
         super().__init__(text, parent)
@@ -73,8 +102,62 @@ class StatusBadge(QLabel):
 
     def set_status_role(self, role: str) -> None:
         self.setProperty("statusRole", role)
-        self.style().unpolish(self)
-        self.style().polish(self)
+        repolish(self)
+
+
+class StatusIndicator(StatusBadge):
+    _GLYPHS = {
+        "active": "●",
+        "connected": "●",
+        "success": "●",
+        "connecting": "◐",
+        "waiting": "◐",
+        "inactive": "○",
+        "disabled": "○",
+        "warning": "▲",
+        "error": "◆",
+        "danger": "◆",
+    }
+    _ROLES = {
+        "active": "success",
+        "connected": "success",
+        "success": "success",
+        "connecting": "info",
+        "waiting": "waiting",
+        "inactive": "inactive",
+        "disabled": "inactive",
+        "warning": "warning",
+        "error": "danger",
+        "danger": "danger",
+    }
+
+    def __init__(
+        self,
+        name: str = "",
+        state: str = "inactive",
+        detail: str = "",
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent=parent)
+        self.set_indicator(name, state, detail)
+
+    def set_indicator(
+        self,
+        name: str,
+        state: str,
+        detail: str = "",
+        state_label: str | None = None,
+    ) -> None:
+        normalized = state if state in self._GLYPHS else "error"
+        self.set_status_role(self._ROLES[normalized])
+        self.setProperty("statusState", normalized)
+        glyph = self._GLYPHS[normalized]
+        visible_state = state_label or state
+        self.setText(f"{glyph} {name}: {visible_state}")
+        self.setToolTip(detail)
+        self.setAccessibleName(f"{name}: {visible_state}")
+        self.setAccessibleDescription(detail)
+        repolish(self)
 
 
 class CompactButton(QPushButton):
@@ -152,12 +235,16 @@ class EmptyState(_NamedFrame):
     def __init__(self, title: str = "", detail: str = "", parent: QWidget | None = None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        heading = PanelHeader(title)
-        description = QLabel(detail)
-        description.setObjectName("Metadata")
-        description.setWordWrap(True)
-        layout.addWidget(heading)
-        layout.addWidget(description)
+        layout.addStretch()
+        self.heading = PanelHeader(title)
+        self.description = QLabel(detail)
+        self.description.setObjectName("Metadata")
+        self.description.setWordWrap(True)
+        self.description.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.heading)
+        layout.addWidget(self.description)
+        layout.addStretch()
 
 
 class ModalDialog(QDialog):
