@@ -21,8 +21,20 @@ def application_icon_path() -> Path:
     return Path(__file__).resolve().parent / "assets" / "app-icon.png"
 
 
+def set_windows_app_user_model_id() -> None:
+    """Give Windows one stable identity for the process and its shortcuts."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        "OK7PS.AntennaPatternLab"
+    )
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO)
+    set_windows_app_user_model_id()
     application = QApplication(sys.argv)
     application.setApplicationName("Antenna Pattern Lab")
     application.setOrganizationName("OK7PS")
@@ -43,7 +55,7 @@ def main() -> int:
     window = MainWindow(repository)
     window.show()
     QTimer.singleShot(0, window.show_setup_if_needed)
-    QTimer.singleShot(1500, window.check_updates_if_enabled)
+    QTimer.singleShot(1500, window.check_updates_at_startup)
     return application.exec()
 
 

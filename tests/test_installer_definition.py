@@ -43,3 +43,5 @@ def test_installer_uses_application_icon_and_fills_dependency_memo():
     spec = (ROOT / "AntennaPatternLab.spec").read_text(encoding="utf-8")
     assert 'icon="src/antenna_pattern_lab/assets/app-icon.ico"' in spec
     assert "assets/app-icon.png" in spec
+    assert 'AppUserModelID: "OK7PS.AntennaPatternLab"' in script
+    assert 'IconFilename: "{app}\\AntennaPatternLab.ico"' in script

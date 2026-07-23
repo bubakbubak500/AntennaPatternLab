@@ -1,6 +1,6 @@
 #define MyAppName "Antenna Pattern Lab"
 #ifndef MyAppVersion
-#define MyAppVersion "0.34.0"
+#define MyAppVersion "0.35.0"
 #endif
 #define MyAppPublisher "OK7PS"
 #define MyAppExeName "AntennaPatternLab.exe"
@@ -28,6 +28,7 @@ SolidCompression=yes
 WizardStyle=modern dynamic
 SetupIconFile=..\src\antenna_pattern_lab\assets\app-icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+ChangesAssociations=yes
 CloseApplications=yes
 RestartApplications=no
 VersionInfoVersion={#MyAppVersion}.0
@@ -70,11 +71,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\dist\AntennaPatternLab\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\src\antenna_pattern_lab\assets\app-icon.ico"; DestDir: "{app}"; DestName: "AntennaPatternLab.ico"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\AntennaPatternLab.ico"; AppUserModelID: "OK7PS.AntennaPatternLab"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\AntennaPatternLab.ico"; AppUserModelID: "OK7PS.AntennaPatternLab"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

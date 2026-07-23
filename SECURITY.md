@@ -22,6 +22,8 @@ mitigation. You should receive an initial response within seven days.
 ## Release integrity
 
 Official Windows releases are published only through GitHub Releases. The
-application and installer are Authenticode-signed, release checksums are
-published, and the in-app updater verifies the installer's SHA-256 before making
-it available to launch.
+current application and installer are not Authenticode-signed. Release checksums
+and GitHub build-provenance attestations are published, and the in-app updater
+verifies the installer's SHA-256 before making it available to launch. Windows
+may show an unknown-publisher warning until a trusted signing certificate is
+introduced.
