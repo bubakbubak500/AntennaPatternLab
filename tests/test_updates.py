@@ -1,6 +1,7 @@
 from io import BytesIO
 import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +10,7 @@ from antenna_pattern_lab.updates import (
     download_verified_installer,
     parse_release_manifest,
 )
+from antenna_pattern_lab import ui
 
 
 class Response(BytesIO):
@@ -19,11 +21,49 @@ class Response(BytesIO):
         self.close()
 
 
+class ImmediateThread:
+    def __init__(self, *, target, **_kwargs):
+        self.target = target
+
+    def start(self):
+        self.target()
+
+
+class RecordedSignal:
+    def __init__(self):
+        self.values = []
+
+    def emit(self, value):
+        self.values.append(value)
+
+
 def test_default_release_channel_is_official_github_latest_release():
     assert DEFAULT_RELEASE_MANIFEST_URL == (
         "https://github.com/bubakbubak500/AntennaPatternLab/"
         "releases/latest/download/release-manifest.json"
     )
+
+
+def test_startup_always_checks_the_fixed_release_channel(monkeypatch):
+    expected = object()
+    requested = []
+    monkeypatch.setattr(ui.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(
+        ui,
+        "check_for_update",
+        lambda url, version: requested.append((url, version)) or expected,
+    )
+    checked = RecordedSignal()
+    failed = RecordedSignal()
+    window = SimpleNamespace(
+        bridge=SimpleNamespace(update_checked=checked, update_failed=failed)
+    )
+
+    ui.MainWindow.check_updates_at_startup(window)
+
+    assert requested == [(DEFAULT_RELEASE_MANIFEST_URL, ui.__version__)]
+    assert checked.values == [expected]
+    assert failed.values == []
 
 
 def test_manifest_requires_https_hash_and_newer_semver():

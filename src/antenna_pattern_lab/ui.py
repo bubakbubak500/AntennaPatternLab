@@ -663,6 +663,7 @@ class MainWindow(QMainWindow):
         saved_language = str(self.settings.value("language", "CZE"))
         self.language_code = saved_language if saved_language in TRANSLATIONS else "CZE"
         self.setWindowTitle("Antenna Pattern Lab · FT8 / WSPR")
+        self.setWindowIcon(QApplication.instance().windowIcon())
         self.resize(1180, 760)
         self._build_ui()
         self._connect_signals()
@@ -2403,18 +2404,10 @@ class MainWindow(QMainWindow):
     def _open_updates(self) -> None:
         UpdateDialog(self.settings, self.language_code, self).exec()
 
-    def check_updates_if_enabled(self) -> None:
-        if not bool(int(self.settings.value("automatic_update_checks", 0))):
-            return
-        url = str(
-            self.settings.value("release_manifest_url", DEFAULT_RELEASE_MANIFEST_URL)
-        ).strip()
-        if not url:
-            return
-
+    def check_updates_at_startup(self) -> None:
         def worker() -> None:
             try:
-                result = check_for_update(url, __version__)
+                result = check_for_update(DEFAULT_RELEASE_MANIFEST_URL, __version__)
             except Exception as exc:
                 self.bridge.update_failed.emit(str(exc))
             else:

@@ -99,8 +99,9 @@ CSV export can be used for independent analysis or archival.
 
 ## 9. Updates
 
-Open **Help → Updates** to check the official GitHub release channel. Automatic
-checks at startup are disabled until you opt in.
+Open **Settings → Updates** to check the official GitHub release channel. Automatic
+checks run in the background on every startup. If the internet or GitHub is
+unavailable, startup continues normally and no error is shown.
 
 The update process:
 
@@ -110,7 +111,9 @@ The update process:
 4. publishes the `.exe` only after the digest matches;
 5. asks before launching the verified installer.
 
-Always confirm that Windows displays the expected Authenticode publisher.
+Current releases are not Authenticode-signed, so Windows may report an unknown
+publisher or show a SmartScreen warning. Download only from the official GitHub
+Releases page and compare the installer with the published SHA-256 checksum.
 
 ## 10. Diagnostics and data
 

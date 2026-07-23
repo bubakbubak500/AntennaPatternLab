@@ -6,18 +6,15 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
 from antenna_pattern_lab.update_dialog import UpdateDialog
-from antenna_pattern_lab.updates import DEFAULT_RELEASE_MANIFEST_URL
-
-
-def test_update_dialog_is_opt_in_and_persists_channel(tmp_path):
+def test_update_dialog_uses_fixed_channel_and_migrates_old_settings(tmp_path):
     application = QApplication.instance() or QApplication([])
     settings = QSettings(str(tmp_path / "updates.ini"), QSettings.Format.IniFormat)
+    settings.setValue("release_manifest_url", "https://releases.example/manifest.json")
+    settings.setValue("automatic_update_checks", 0)
     dialog = UpdateDialog(settings, "ENG")
-    assert not dialog.automatic.isChecked()
-    assert dialog.channel_url.text() == DEFAULT_RELEASE_MANIFEST_URL
-    dialog.channel_url.setText("https://releases.example/manifest.json")
-    dialog.automatic.setChecked(True)
+    assert not hasattr(dialog, "channel_url")
+    assert not hasattr(dialog, "automatic")
     dialog.accept()
-    assert settings.value("release_manifest_url") == "https://releases.example/manifest.json"
-    assert int(settings.value("automatic_update_checks")) == 1
+    assert not settings.contains("release_manifest_url")
+    assert not settings.contains("automatic_update_checks")
     application.processEvents()

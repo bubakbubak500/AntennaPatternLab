@@ -16,13 +16,20 @@ without requiring a server.
 
 ## Download
 
-Download the current signed Windows installer from
+Download the current Windows installer from
 [GitHub Releases](https://github.com/bubakbubak500/AntennaPatternLab/releases/latest).
 
 The application can check the same official GitHub release channel for updates.
-Automatic checks are opt-in. Every downloaded installer is accepted only after its
-SHA-256 digest matches the published release manifest, and it is never launched
-without an additional confirmation.
+It checks in the background on every startup and fails silently when offline.
+Every downloaded installer is accepted only after its SHA-256 digest matches the
+published release manifest, and it is never launched without an additional
+confirmation.
+
+> [!WARNING]
+> Current Windows packages are not Authenticode-signed. Windows can therefore
+> display **Unknown publisher** or a Microsoft Defender SmartScreen warning.
+> Download only from this repository's Releases page. Each release includes
+> SHA-256 checksums and GitHub build-provenance attestations.
 
 ## Main features
 
@@ -38,13 +45,14 @@ without an additional confirmation.
 - local SQLite storage and diagnostic export;
 - English and Czech application UI;
 - verified, consent-driven setup assistance for WSJT-X and Hamlib;
-- signed Windows application and installer releases.
+- reproducible Windows releases with checksums and GitHub build provenance.
 
 ## Quick start
 
 1. Download the latest installer from
    [Releases](https://github.com/bubakbubak500/AntennaPatternLab/releases/latest).
-2. Verify that Windows reports the expected publisher before installing.
+2. Compare the installer's SHA-256 with `SHA256SUMS.txt`; Windows currently
+   reports an unknown publisher because the release is unsigned.
 3. Start Antenna Pattern Lab and complete the first-run assistant.
 4. Use **Help → Add demo data** to explore the application without a radio.
 5. For live collection, enter your callsign and locator, select the band and mode,
@@ -99,9 +107,9 @@ Build an unsigned local installer:
 .\build_installer.ps1
 ```
 
-Official releases are built and Authenticode-signed by GitHub Actions. Signing
-credentials are stored only as encrypted GitHub Actions secrets and are never
-committed to this repository. See [Release process](docs/RELEASING.md).
+Official releases are built by GitHub Actions, accompanied by SHA-256 checksums
+and a GitHub artifact attestation. Authenticode signing can be added later
+without changing the update channel. See [Release process](docs/RELEASING.md).
 
 ## Contributing
 
