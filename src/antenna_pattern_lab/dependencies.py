@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import os
+from pathlib import Path
+import shutil
+from typing import Callable, Mapping
+
+HAMLIB_RELEASES_URL = "https://github.com/Hamlib/Hamlib/releases/latest"
+WSJTX_DOWNLOADS_URL = "https://wsjtx.github.io/wsjtx/downloads.html"
+
+
+@dataclass(frozen=True, slots=True)
+class DependencyStatus:
+    key: str
+    display_name: str
+    found: bool
+    executable: Path | None
+    official_url: str
+
+
+def detect_external_tools(
+    environment: Mapping[str, str] | None = None,
+    which: Callable[..., str | None] = shutil.which,
+) -> tuple[DependencyStatus, DependencyStatus]:
+    """Detect tools without executing them or modifying the system."""
+    env = {
+        key.casefold(): value
+        for key, value in (os.environ if environment is None else environment).items()
+    }
+    if not env.get("systemdrive"):
+        program_files = Path(env.get("programfiles", ""))
+        if program_files.name.casefold() in {"program files", "program files (x86)"}:
+            system_drive = str(program_files.parent)
+        else:
+            system_drive = program_files.anchor or Path.home().anchor or "C:\\"
+        env["systemdrive"] = system_drive
+    elif len(env["systemdrive"]) == 2 and env["systemdrive"].endswith(":"):
+        env["systemdrive"] += "\\"
+    hamlib = _find_executable(
+        "rigctld.exe",
+        env,
+        which,
+        relative_candidates=(
+            ("ProgramFiles", "Hamlib", "bin", "rigctld.exe"),
+            ("ProgramFiles(x86)", "Hamlib", "bin", "rigctld.exe"),
+            ("LOCALAPPDATA", "Programs", "Hamlib", "bin", "rigctld.exe"),
+        ),
+        glob_candidates=(
+            ("ProgramFiles", "hamlib-w64-*", "bin", "rigctld.exe"),
+            ("ProgramFiles(x86)", "hamlib-w64-*", "bin", "rigctld.exe"),
+            ("LOCALAPPDATA", "Programs", "hamlib-w64-*", "bin", "rigctld.exe"),
+        ),
+    )
+    wsjtx = _find_executable(
+        "wsjtx.exe",
+        env,
+        which,
+        relative_candidates=(
+            ("ProgramFiles", "wsjtx", "bin", "wsjtx.exe"),
+            ("ProgramFiles", "WSJT-X", "bin", "wsjtx.exe"),
+            ("ProgramFiles(x86)", "wsjtx", "bin", "wsjtx.exe"),
+            ("ProgramFiles(x86)", "WSJT-X", "bin", "wsjtx.exe"),
+            ("LOCALAPPDATA", "Programs", "wsjtx", "bin", "wsjtx.exe"),
+            ("LOCALAPPDATA", "Programs", "WSJT-X", "bin", "wsjtx.exe"),
+            ("LOCALAPPDATA", "WSJT-X", "bin", "wsjtx.exe"),
+            ("SystemDrive", "WSJT", "wsjtx", "bin", "wsjtx.exe"),
+        ),
+    )
+    return (
+        DependencyStatus("hamlib", "Hamlib rigctld", hamlib is not None, hamlib, HAMLIB_RELEASES_URL),
+        DependencyStatus("wsjtx", "WSJT-X", wsjtx is not None, wsjtx, WSJTX_DOWNLOADS_URL),
+    )
+
+
+def _find_executable(
+    filename: str,
+    env: Mapping[str, str],
+    which: Callable[..., str | None],
+    *,
+    relative_candidates: tuple[tuple[str, ...], ...],
+    glob_candidates: tuple[tuple[str, ...], ...] = (),
+) -> Path | None:
+    found = which(filename, path=env.get("path"))
+    if found:
+        path = Path(found)
+        if path.is_file():
+            return path.resolve()
+    for parts in relative_candidates:
+        root = env.get(parts[0].casefold())
+        if not root:
+            continue
+        candidate = Path(root).joinpath(*parts[1:])
+        if candidate.is_file():
+            return candidate.resolve()
+    for parts in glob_candidates:
+        root = env.get(parts[0].casefold())
+        if not root:
+            continue
+        matches = sorted(
+            Path(root).glob(str(Path(*parts[1:]))),
+            key=lambda path: path.parent.parent.name.casefold(),
+            reverse=True,
+        )
+        for candidate in matches:
+            if candidate.is_file():
+                return candidate.resolve()
+    return None
+
+
+def rigctld_command(
+    executable: str | Path,
+    model_id: int,
+    serial_port: str,
+    baud_rate: int,
+    tcp_port: int = 4532,
+) -> tuple[str, ...]:
+    if model_id < 1:
+        raise ValueError("Hamlib model ID must be positive.")
+    if not serial_port.strip():
+        raise ValueError("Serial port is required.")
+    if baud_rate < 300 or tcp_port not in range(1, 65536):
+        raise ValueError("Baud rate or TCP port is invalid.")
+    return (
+        str(executable), "-m", str(model_id), "-r", serial_port.strip(),
+        "-s", str(baud_rate), "-t", str(tcp_port),
+    )

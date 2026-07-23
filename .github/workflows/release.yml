@@ -1,0 +1,133 @@
+name: Signed Windows release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Verify tag and project version
+        shell: pwsh
+        run: |
+          $project = Get-Content pyproject.toml -Raw
+          $version = [regex]::Match($project, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          if (-not $version) { throw "Project version was not found." }
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} does not match project version $version."
+          }
+
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest
+
+      - name: Build application
+        run: pyinstaller --noconfirm AntennaPatternLab.spec
+
+      - name: Import code-signing certificate
+        id: certificate
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:CERTIFICATE_BASE64 -or -not $env:CERTIFICATE_PASSWORD) {
+            throw "Code-signing secrets are not configured."
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "code-signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+          $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password |
+            Where-Object HasPrivateKey |
+            Select-Object -First 1
+          if (-not $certificate.Thumbprint) { throw "Certificate import failed." }
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+          Remove-Item -LiteralPath $pfx -Force
+
+      - name: Locate signing and installer tools
+        id: tools
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          $iscc = Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not $signtool -or -not $iscc) { throw "Required build tools were not found." }
+          "signtool=$($signtool.FullName)" >> $env:GITHUB_OUTPUT
+          "iscc=$($iscc.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Sign application
+        shell: pwsh
+        run: |
+          & "${{ steps.tools.outputs.signtool }}" sign `
+            /fd SHA256 `
+            /sha1 "${{ steps.certificate.outputs.thumbprint }}" `
+            /td SHA256 `
+            /tr http://timestamp.digicert.com `
+            "dist\AntennaPatternLab\AntennaPatternLab.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Application signing failed." }
+
+      - name: Build signed installer and update manifest
+        shell: pwsh
+        run: |
+          .\build_installer.ps1 `
+            -Compiler "${{ steps.tools.outputs.iscc }}" `
+            -SignTool "${{ steps.tools.outputs.signtool }}" `
+            -CertificateThumbprint "${{ steps.certificate.outputs.thumbprint }}" `
+            -ReleaseBaseUrl "https://github.com/bubakbubak500/AntennaPatternLab/releases/latest/download"
+
+      - name: Verify signatures and package application
+        shell: pwsh
+        run: |
+          $project = Get-Content pyproject.toml -Raw
+          $version = [regex]::Match($project, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          $installer = "release\AntennaPatternLab-$version-setup-win-x64.exe"
+          foreach ($file in @("dist\AntennaPatternLab\AntennaPatternLab.exe", $installer)) {
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne "Valid") {
+              throw "Invalid Authenticode signature for $file`: $($signature.Status)"
+            }
+          }
+          Compress-Archive -Path "dist\AntennaPatternLab\*" `
+            -DestinationPath "release\AntennaPatternLab-$version-win-x64.zip"
+          Get-ChildItem release\AntennaPatternLab-$version-* |
+            Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content release\SHA256SUMS.txt -Encoding ascii
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $project = Get-Content pyproject.toml -Raw
+          $version = [regex]::Match($project, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          gh release create "${{ github.ref_name }}" `
+            "release\AntennaPatternLab-$version-setup-win-x64.exe" `
+            "release\AntennaPatternLab-$version-win-x64.zip" `
+            "release\release-manifest.json" `
+            "release\SHA256SUMS.txt" `
+            --title "Antenna Pattern Lab $version" `
+            --generate-notes `
+            --verify-tag
