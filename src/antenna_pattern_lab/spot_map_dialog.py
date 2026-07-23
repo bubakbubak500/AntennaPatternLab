@@ -255,7 +255,7 @@ class SpotMapDialog(QDialog):
             artist, = self.axis.plot(
                 [coordinate[1] for coordinate in segment],
                 [coordinate[0] for coordinate in segment],
-                color=TOKENS.warning,
+                color=TOKENS.map_route,
                 linewidth=2.2,
                 alpha=0.95,
                 zorder=3,

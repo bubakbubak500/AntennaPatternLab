@@ -11,7 +11,7 @@ import time
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtCore import QObject, QSettings, Qt, QTimer, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -47,7 +47,6 @@ from .analysis import (
     trend_adjusted_sector_profile,
 )
 from .appearance_dialog import AppearanceDialog
-from .design_system import AppShell, DataPanel, DataTable, PanelHeader, TopToolbar
 from .ab_dialog import AbComparisonDialog
 from .adif_io import import_adif
 from .campaign_dialog import CampaignDialog
@@ -86,6 +85,7 @@ from .spot_map_dialog import SpotMapDialog
 from .settings_dialog import CommunicationSettings, CommunicationSettingsDialog
 from .theme import (
     TOKENS,
+    DesignStyle,
     ThemeController,
     apply_figure_theme,
     current_tokens,
@@ -690,16 +690,22 @@ class MainWindow(QMainWindow):
             self.status.setToolTip(str(self.repository.last_backup_path))
 
     def _build_ui(self) -> None:
-        root = AppShell()
+        root = QWidget()
+        root.setObjectName("AppShell")
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(6)
+        layout.setContentsMargins(16, 12, 16, 12)
+        self._root_layout = layout
 
-        title = PanelHeader("ANTENNA PATTERN LAB")
+        title = QLabel("ANTENNA PATTERN LAB")
+        title.setObjectName("PanelHeader")
+        title.setStyleSheet(
+            "font-size: 20px; font-weight: 700; letter-spacing: 2px;"
+        )
+        self._title = title
         self.subtitle = QLabel()
         layout.addWidget(title)
 
-        controls = TopToolbar()
+        controls = QFrame()
         controls.setObjectName("primaryControls")
         controls.setFrameShape(QFrame.Shape.StyledPanel)
         controls_layout = QGridLayout(controls)
@@ -801,7 +807,8 @@ class MainWindow(QMainWindow):
         controls.setMaximumHeight(105)
         layout.addWidget(controls)
 
-        chart_panel = DataPanel()
+        chart_panel = QWidget()
+        chart_panel.setObjectName("DataPanel")
         chart_layout = QVBoxLayout(chart_panel)
         chart_layout.setContentsMargins(0, 0, 0, 0)
         chart_controls = QHBoxLayout()
@@ -882,13 +889,15 @@ class MainWindow(QMainWindow):
         self.canvas.mpl_connect("motion_notify_event", self._on_graph_hover)
         self.canvas.mpl_connect("button_press_event", self._on_graph_click)
         chart_layout.addWidget(self.canvas, 1)
-        self.graph_details = DataTable(0, 5)
+        self.graph_details = QTableWidget(0, 5)
+        self.graph_details.setObjectName("DataTable")
         self.graph_details.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.graph_details.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.graph_details.horizontalHeader().setStretchLastSection(True)
         self.graph_details.setMaximumHeight(155)
         chart_layout.addWidget(self.graph_details)
-        self.table = DataTable(0, 8)
+        self.table = QTableWidget(0, 8)
+        self.table.setObjectName("DataTable")
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -1069,17 +1078,47 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         tokens = self.theme_controller.tokens
+        monitor = self.theme_controller.design_style == DesignStyle.MONITOR
+        if not hasattr(self, "_classic_widget_fonts"):
+            self._classic_widget_fonts = [
+                (widget, QFont(widget.font()))
+                for widget in (
+                    self.callsign,
+                    self.tx_grid,
+                    self.history_hours,
+                    self.table,
+                    self.graph_details,
+                )
+            ]
         self.setPalette(QApplication.palette())
         self.setStyleSheet("")
-        self.live_button.setStyleSheet("font-weight: 600;")
+        if monitor:
+            self._root_layout.setContentsMargins(12, 8, 12, 8)
+            self._root_layout.setSpacing(6)
+            self._title.setStyleSheet(
+                f"font-size: {tokens.heading_font_px}px; "
+                "font-weight: 600; letter-spacing: 1px;"
+            )
+            self.live_button.setStyleSheet("font-weight: 600;")
+            for widget, _font in self._classic_widget_fonts:
+                widget.setFont(monospace_font())
+        else:
+            self._root_layout.setContentsMargins(16, 12, 16, 12)
+            self._root_layout.setSpacing(-1)
+            self._title.setStyleSheet(
+                "font-size: 20px; font-weight: 700; letter-spacing: 2px;"
+            )
+            self.live_button.setStyleSheet("font-weight: 700;")
+            for widget, font in self._classic_widget_fonts:
+                widget.setFont(font)
         self.clear_button.setStyleSheet(semantic_style("danger"))
         self.graph_info.setStyleSheet(
-            semantic_style("info", bold=True, size_px=tokens.heading_font_px)
+            semantic_style(
+                "info",
+                bold=True,
+                size_px=tokens.heading_font_px if monitor else 17,
+            )
         )
-        for widget in (self.callsign, self.tx_grid, self.history_hours):
-            widget.setFont(monospace_font())
-        self.table.setFont(monospace_font())
-        self.graph_details.setFont(monospace_font())
         apply_figure_theme(self.figure)
 
     def _theme_changed(self, _tokens) -> None:
@@ -1418,7 +1457,7 @@ class MainWindow(QMainWindow):
         quality_colors = {
             "none": TOKENS.divider,
             "low": TOKENS.text_muted,
-            "medium": TOKENS.accent,
+            "medium": TOKENS.accent_secondary,
             "high": TOKENS.success,
         }
         bars = axis.bar(
@@ -2546,7 +2585,7 @@ class MainWindow(QMainWindow):
             "disconnected": TOKENS.text_secondary,
             "connecting": TOKENS.warning,
             "connected": TOKENS.success,
-            "error": TOKENS.danger,
+            "error": TOKENS.danger_strong,
         }
         label = self._text("connection")[self._connection_state]
         self.connection_indicator.setText(f"● MQTT: {label}")
@@ -2594,8 +2633,8 @@ class MainWindow(QMainWindow):
             "disconnected": TOKENS.text_secondary,
             "waiting": TOKENS.warning,
             "connected": TOKENS.success,
-            "stale": TOKENS.warning,
-            "error": TOKENS.danger,
+            "stale": TOKENS.warning_strong,
+            "error": TOKENS.danger_strong,
         }
         label_key = self._wsjtx_operating_state if state == "connected" and self._wsjtx_operating_state else state
         labels = self._text("wsjtx")
@@ -2784,7 +2823,7 @@ class MainWindow(QMainWindow):
             "disabled": TOKENS.text_secondary,
             "connecting": TOKENS.warning,
             "connected": TOKENS.success,
-            "error": TOKENS.danger,
+            "error": TOKENS.danger_strong,
         }
         label = self._text("hamlib_states").get(state, self._text("hamlib_states")["error"])
         self.hamlib_indicator.setText(f"● Hamlib: {label}")
@@ -2874,7 +2913,7 @@ class MainWindow(QMainWindow):
             "disabled": TOKENS.text_secondary,
             "connecting": TOKENS.warning,
             "connected": TOKENS.success,
-            "error": TOKENS.danger,
+            "error": TOKENS.danger_strong,
         }
         labels = self._text("rotator_states")
         safety = self._rotator_safety
@@ -2893,9 +2932,9 @@ class MainWindow(QMainWindow):
             f"● {self._text('rotator_name')}: {label}{position}"
         )
         color = (
-            TOKENS.danger
+            TOKENS.danger_strong
             if safety.severity == "error"
-            else TOKENS.warning
+            else TOKENS.warning_strong
             if safety.severity == "warning"
             else colors.get(state, colors["error"])
         )

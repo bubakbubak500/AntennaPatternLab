@@ -28,13 +28,16 @@ class AppearanceDialog(QDialog):
         layout.addWidget(intro)
         form = QFormLayout()
         self.design_style = QComboBox()
-        self.design_style.addItem("Classic", DesignStyle.CLASSIC)
+        self.design_style.addItem(
+            "Původní (Classic)" if czech else "Original (Classic)",
+            DesignStyle.CLASSIC,
+        )
         self.design_style.addItem("Monitor", DesignStyle.MONITOR)
         self.design_style.setCurrentIndex(self.design_style.findData(design_style))
         self.theme = ThemeToggle()
         self.theme.set_preference(preference)
         form.addRow("Vzhled" if czech else "Design", self.design_style)
-        form.addRow("Motiv" if czech else "Theme", self.theme)
+        form.addRow("Motiv Monitoru" if czech else "Monitor theme", self.theme)
         layout.addLayout(form)
         hint = QLabel(
             "Volba „Podle systému“ reaguje na změny motivu Windows bez restartu."
@@ -50,6 +53,15 @@ class AppearanceDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self.design_style.currentIndexChanged.connect(
+            self._update_theme_availability
+        )
+        self._update_theme_availability()
 
     def values(self) -> tuple[DesignStyle, ThemePreference]:
         return self.design_style.currentData(), self.theme.currentData()
+
+    def _update_theme_availability(self, _index: int | None = None) -> None:
+        self.theme.setEnabled(
+            self.design_style.currentData() == DesignStyle.MONITOR
+        )

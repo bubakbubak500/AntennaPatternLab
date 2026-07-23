@@ -204,7 +204,11 @@ class CampaignAttachmentsDialog(QDialog):
                     item.setData(Qt.ItemDataRole.UserRole, attachment.id)
                 if column == 6:
                     item.setForeground(
-                        QColor(TOKENS.success if status == "ok" else TOKENS.danger)
+                        QColor(
+                            TOKENS.success
+                            if status == "ok"
+                            else TOKENS.danger_strong
+                        )
                     )
                 self.table.setItem(row, column, item)
         self.table.resizeColumnsToContents()

@@ -34,10 +34,15 @@ class ThemeTokens:
     text_inverse: str
     accent: str
     accent_hover: str
+    accent_secondary: str
     success: str
     warning: str
+    warning_strong: str
+    warning_chart: str
     danger: str
+    danger_strong: str
     info: str
+    info_soft: str
     selected: str
     hovered: str
     disabled: str
@@ -47,6 +52,7 @@ class ThemeTokens:
     chart_series: tuple[str, ...]
     map_water: str
     map_land: str
+    map_route: str
     spacing_1: int = 2
     spacing_2: int = 4
     spacing_3: int = 6
@@ -74,10 +80,15 @@ CLASSIC_TOKENS = ThemeTokens(
     text_inverse="#ffffff",
     accent="#0969da",
     accent_hover="#0e7490",
+    accent_secondary="#0e7490",
     success="#1a7f37",
     warning="#9a6700",
-    danger="#cf222e",
+    warning_strong="#bc4c00",
+    warning_chart="#bf8700",
+    danger="#b42318",
+    danger_strong="#cf222e",
     info="#0969da",
+    info_soft="#54aeff",
     selected="#dff1fb",
     hovered="#eaeef2",
     disabled="#8c959f",
@@ -87,6 +98,7 @@ CLASSIC_TOKENS = ThemeTokens(
     chart_series=("#0f766e", "#0969da", "#9a6700", "#b388ff", "#cf222e", "#19b7a5"),
     map_water="#dff1fb",
     map_land="#edf2e8",
+    map_route="#f0883e",
 )
 
 DARK_TOKENS = ThemeTokens(
@@ -103,10 +115,15 @@ DARK_TOKENS = ThemeTokens(
     text_inverse="#edf3f7",
     accent="#2cc7c9",
     accent_hover="#56d9d8",
+    accent_secondary="#45b9c8",
     success="#55b77a",
     warning="#d1a44b",
+    warning_strong="#d18d4b",
+    warning_chart="#c9953f",
     danger="#df6b72",
+    danger_strong="#e35d67",
     info="#65a8e8",
+    info_soft="#7bb9ed",
     selected="#183e49",
     hovered="#1c303b",
     disabled="#61717e",
@@ -116,6 +133,7 @@ DARK_TOKENS = ThemeTokens(
     chart_series=("#2cc7c9", "#65a8e8", "#d1a44b", "#a78bda", "#df6b72", "#55b77a"),
     map_water="#101f2b",
     map_land="#192a28",
+    map_route="#d9984f",
 )
 
 LIGHT_TOKENS = ThemeTokens(
@@ -132,10 +150,15 @@ LIGHT_TOKENS = ThemeTokens(
     text_inverse="#ffffff",
     accent="#007f82",
     accent_hover="#00696c",
+    accent_secondary="#176f88",
     success="#23733d",
     warning="#8a5a00",
+    warning_strong="#984400",
+    warning_chart="#815400",
     danger="#a72c36",
+    danger_strong="#9e2532",
     info="#1769a6",
+    info_soft="#347fb5",
     selected="#ccebee",
     hovered="#e4f1f2",
     disabled="#7b8994",
@@ -145,6 +168,7 @@ LIGHT_TOKENS = ThemeTokens(
     chart_series=("#007f82", "#1769a6", "#8a5a00", "#7254a3", "#a72c36", "#23733d"),
     map_water="#dcecf3",
     map_land="#e6ece2",
+    map_route="#9a561e",
 )
 
 _active_tokens = CLASSIC_TOKENS
@@ -166,7 +190,9 @@ def semantic_style(role: str, *, bold: bool = False, size_px: int | None = None)
     color = getattr(current_tokens(), role)
     parts = [f"color: {color}"]
     if bold:
-        parts.append("font-weight: 600")
+        parts.append(
+            f"font-weight: {700 if current_tokens() is CLASSIC_TOKENS else 600}"
+        )
     if size_px is not None:
         parts.append(f"font-size: {size_px}px")
     return "; ".join(parts) + ";"
@@ -255,9 +281,9 @@ QMenu {{
     background: {tokens.surface_1};
     border: 1px solid {tokens.panel_border};
 }}
-QFrame#AppShell, QFrame#TopToolbar, QFrame#SideNavigation,
-QFrame#DataPanel, QFrame#MetricCard, QFrame#PropertyGrid,
-QFrame#LogViewer, QFrame#EmptyState, QFrame#primaryControls {{
+QWidget#AppShell, QWidget#TopToolbar, QWidget#SideNavigation,
+QWidget#DataPanel, QWidget#MetricCard, QWidget#PropertyGrid,
+QWidget#LogViewer, QWidget#EmptyState, QWidget#primaryControls {{
     background: {tokens.panel_background};
     border: 1px solid {tokens.panel_border};
     border-radius: {tokens.radius_medium}px;
@@ -423,8 +449,12 @@ class ThemeController(QObject):
         self.application = QApplication.instance()
         if self.application is None:
             raise RuntimeError("ThemeController requires a QApplication")
-        self._native_palette = self.application.style().standardPalette()
+        # Capture the exact application state before Monitor touches it. Using
+        # style().standardPalette() here changes the native Windows palette
+        # (notably to a beige window background on some systems).
+        self._native_palette = QPalette(self.application.palette())
         self._native_font = QFont(self.application.font())
+        self._native_stylesheet = self.application.styleSheet()
         style_hints = self.application.styleHints()
         signal = getattr(style_hints, "colorSchemeChanged", None)
         if signal is not None:
@@ -469,7 +499,7 @@ class ThemeController(QObject):
         global _active_tokens
         _active_tokens = self.tokens
         if self.design_style == DesignStyle.CLASSIC:
-            self.application.setStyleSheet("")
+            self.application.setStyleSheet(self._native_stylesheet)
             self.application.setPalette(self._native_palette)
             self.application.setFont(self._native_font)
         else:

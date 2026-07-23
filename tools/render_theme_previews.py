@@ -20,7 +20,11 @@ from antenna_pattern_lab.theme import DesignStyle, ThemePreference
 from antenna_pattern_lab.ui import MainWindow
 
 
-def render(output_directory: Path, preference: ThemePreference) -> Path:
+def render(
+    output_directory: Path,
+    design_style: DesignStyle,
+    preference: ThemePreference,
+) -> Path:
     with tempfile.TemporaryDirectory(
         prefix=f"antenna-{preference.value}-", ignore_cleanup_errors=True
     ) as temporary:
@@ -28,7 +32,7 @@ def render(output_directory: Path, preference: ThemePreference) -> Path:
         settings = QSettings(
             str(temporary_path / "settings.ini"), QSettings.Format.IniFormat
         )
-        settings.setValue("ui/design_style", DesignStyle.MONITOR.value)
+        settings.setValue("ui/design_style", design_style.value)
         settings.setValue("ui/theme", preference.value)
         settings.setValue("language", "ENG")
         repository = SpotRepository(temporary_path / "preview.sqlite3")
@@ -37,7 +41,12 @@ def render(output_directory: Path, preference: ThemePreference) -> Path:
         window.show()
         window.add_demo_data()
         application.processEvents()
-        destination = output_directory / f"monitor-{preference.value}.png"
+        name = (
+            "classic"
+            if design_style == DesignStyle.CLASSIC
+            else f"monitor-{preference.value}"
+        )
+        destination = output_directory / f"{name}.png"
         if not window.grab().save(str(destination)):
             raise RuntimeError(f"Could not save {destination}")
         window.close()
@@ -49,5 +58,10 @@ if __name__ == "__main__":
     application = QApplication.instance() or QApplication(sys.argv)
     output = Path(__file__).resolve().parents[1] / ".ui-preview"
     output.mkdir(exist_ok=True)
-    for selected in (ThemePreference.DARK, ThemePreference.LIGHT):
-        print(render(output, selected))
+    selections = (
+        (DesignStyle.CLASSIC, ThemePreference.SYSTEM),
+        (DesignStyle.MONITOR, ThemePreference.DARK),
+        (DesignStyle.MONITOR, ThemePreference.LIGHT),
+    )
+    for design, selected in selections:
+        print(render(output, design, selected))

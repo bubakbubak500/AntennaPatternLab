@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 import sys
 
-from PySide6.QtCore import QStandardPaths, Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QIcon
+from PySide6.QtCore import QStandardPaths, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .storage import DatabaseMigrationError, SpotRepository
@@ -35,9 +35,6 @@ def set_windows_app_user_model_id() -> None:
 def main() -> int:
     logging.basicConfig(level=logging.INFO)
     set_windows_app_user_model_id()
-    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
     application = QApplication(sys.argv)
     application.setApplicationName("Antenna Pattern Lab")
     application.setOrganizationName("OK7PS")

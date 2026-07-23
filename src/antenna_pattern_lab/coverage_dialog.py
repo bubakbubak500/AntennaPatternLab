@@ -394,7 +394,7 @@ class CoverageDialog(QDialog):
         colors = [
             TOKENS.success
             if item.solar_slot == result.recommended.solar_slot
-            else TOKENS.info
+            else TOKENS.info_soft
             for item in candidates
         ]
         axis.bar(
@@ -456,8 +456,8 @@ class CoverageDialog(QDialog):
         )
         colors = {
             "none": TOKENS.text_muted,
-            "low": TOKENS.danger,
-            "medium": TOKENS.warning,
+            "low": TOKENS.danger_strong,
+            "medium": TOKENS.warning_chart,
             "high": TOKENS.success,
         }
         axis.bar(

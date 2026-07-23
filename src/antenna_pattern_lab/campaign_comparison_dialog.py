@@ -128,7 +128,11 @@ class CampaignComparisonDialog(QDialog):
         heading.setStyleSheet("font-size: 16px; font-weight: 700;")
         layout.addWidget(heading)
         self.quality = QLabel(self.text["quality"][self.result.quality])
-        colors = {"good": TOKENS.success, "medium": TOKENS.warning, "low": TOKENS.danger}
+        colors = {
+            "good": TOKENS.success,
+            "medium": TOKENS.warning,
+            "low": TOKENS.danger_strong,
+        }
         self.quality.setStyleSheet(
             f"color: {colors[self.result.quality]}; font-weight: 700;"
         )
@@ -202,7 +206,11 @@ class CampaignComparisonDialog(QDialog):
         axis = self.figure.add_subplot(111)
         positions = list(range(len(values)))
         colors = [
-            TOKENS.success if value >= 70 else TOKENS.warning if value >= 50 else TOKENS.danger
+            TOKENS.success
+            if value >= 70
+            else TOKENS.warning_chart
+            if value >= 50
+            else TOKENS.danger_strong
             for value in values
         ]
         axis.barh(positions, values, color=colors)
