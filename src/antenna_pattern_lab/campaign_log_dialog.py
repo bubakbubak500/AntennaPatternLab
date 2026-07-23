@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from .campaigns import CampaignLogEntry, LOG_CATEGORIES
 from .storage import SpotRepository
+from .theme import semantic_style
 
 
 TEXT = {
@@ -83,7 +84,7 @@ class CampaignLogDialog(QDialog):
         layout = QVBoxLayout(self)
         intro = QLabel(self.text["intro"])
         intro.setWordWrap(True)
-        intro.setStyleSheet("color: #57606a;")
+        intro.setStyleSheet(semantic_style("text_secondary"))
         layout.addWidget(intro)
 
         entry_row = QHBoxLayout()
@@ -100,7 +101,7 @@ class CampaignLogDialog(QDialog):
         layout.addLayout(entry_row)
 
         self.message = QLabel()
-        self.message.setStyleSheet("color: #b42318;")
+        self.message.setStyleSheet(semantic_style("danger"))
         layout.addWidget(self.message)
 
         self.table = QTableWidget(0, 3)

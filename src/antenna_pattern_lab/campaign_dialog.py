@@ -31,6 +31,7 @@ from .campaigns import (
     assess_campaign_progress,
 )
 from .storage import SpotRepository
+from .theme import TOKENS, semantic_style
 
 
 TEXT = {
@@ -313,7 +314,7 @@ class CampaignDialog(QDialog):
         except ValueError as exc:
             self.active_status.setText(self.text["invalid"].format(error=exc))
             self.active_status.setStyleSheet(
-                "color: #b42318; font-size: 15px; font-weight: 700;"
+                semantic_style("danger", bold=True, size_px=15)
             )
             return
         self.refresh()
@@ -429,7 +430,7 @@ class CampaignDialog(QDialog):
             self.readiness.setText(
                 self.text["readiness_complete"].format(percent=check.percent)
             )
-            color = "#1a7f37"
+            color = TOKENS.success
         else:
             missing = ", ".join(self.text["metadata"][key] for key in check.missing)
             self.readiness.setText(
@@ -438,7 +439,7 @@ class CampaignDialog(QDialog):
                     missing=missing,
                 )
             )
-            color = "#9a6700" if check.percent >= 70 else "#b42318"
+            color = TOKENS.warning if check.percent >= 70 else TOKENS.danger
         self.readiness.setStyleSheet(f"color: {color}; font-weight: 700;")
 
     def refresh(self) -> None:
@@ -464,7 +465,7 @@ class CampaignDialog(QDialog):
         if active is None:
             self.active_status.setText(self.text["inactive"])
             self.active_status.setStyleSheet(
-                "color: #57606a; font-size: 15px; font-weight: 700;"
+                semantic_style("text_secondary", bold=True, size_px=15)
             )
         else:
             self.active_status.setText(
@@ -478,7 +479,7 @@ class CampaignDialog(QDialog):
                 )
             )
             self.active_status.setStyleSheet(
-                "color: #1a7f37; font-size: 15px; font-weight: 700;"
+                semantic_style("success", bold=True, size_px=15)
             )
         self._update_readiness()
 
@@ -520,7 +521,7 @@ class CampaignDialog(QDialog):
                     )
                 if column == 9:
                     item.setForeground(
-                        QColor("#1a7f37" if progress.complete else "#9a6700")
+                        QColor(TOKENS.success if progress.complete else TOKENS.warning)
                     )
                     item.setToolTip(
                         self.text["progress_tip"].format(

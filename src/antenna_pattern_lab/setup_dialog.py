@@ -26,6 +26,7 @@ from .external_install import (
     fetch_release_asset,
     launch_installer,
 )
+from .theme import semantic_style
 
 
 TEXT = {
@@ -128,7 +129,7 @@ class SetupDialog(QDialog):
         layout.setSpacing(7)
         intro = QLabel(self.text["intro"])
         intro.setWordWrap(True)
-        intro.setStyleSheet("color: #9a6700;")
+        intro.setStyleSheet(semantic_style("warning"))
         layout.addWidget(intro)
         for key in ("hamlib", "wsjtx"):
             row = QHBoxLayout()
@@ -216,19 +217,19 @@ class SetupDialog(QDialog):
             if status.found:
                 label.setText(self.text["installed"])
                 label.setToolTip(str(status.executable))
-                label.setStyleSheet("color: #1a7f37;")
+                label.setStyleSheet(semantic_style("success"))
                 self.install_buttons[key].setText(self.text["installed"])
                 self.install_buttons[key].setEnabled(False)
             elif key == self._pending_install_key:
                 label.setText(self.text["checking_install"])
                 label.setToolTip("")
-                label.setStyleSheet("color: #0969da;")
+                label.setStyleSheet(semantic_style("info"))
                 self.install_buttons[key].setText(self.text["install"])
                 self.install_buttons[key].setEnabled(False)
             else:
                 label.setText(self.text["missing"])
                 label.setToolTip("")
-                label.setStyleSheet("color: #b42318;")
+                label.setStyleSheet(semantic_style("danger"))
                 self.install_buttons[key].setText(self.text["install"])
                 self.install_buttons[key].setEnabled(True)
         self.update_command_preview()
@@ -254,7 +255,7 @@ class SetupDialog(QDialog):
             status = self.statuses.get(key)
             if status and not status.found:
                 self.status_labels[key].setText(self.text["missing"])
-                self.status_labels[key].setStyleSheet("color: #b42318;")
+                self.status_labels[key].setStyleSheet(semantic_style("danger"))
                 self.install_buttons[key].setEnabled(True)
 
     def update_command_preview(self) -> None:
@@ -394,7 +395,7 @@ class SetupDialog(QDialog):
             self.status_labels[self._download_key].setText(
                 self.text["checking_install"]
             )
-            self.status_labels[self._download_key].setStyleSheet("color: #0969da;")
+            self.status_labels[self._download_key].setStyleSheet(semantic_style("info"))
             self.install_buttons[self._download_key].setEnabled(False)
             self._detection_timer.start()
         self._download_key = None

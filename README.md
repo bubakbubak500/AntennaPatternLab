@@ -47,6 +47,15 @@ confirmation.
 - verified, consent-driven setup assistance for WSJT-X and Hamlib;
 - reproducible Windows releases with checksums and GitHub build provenance.
 
+### Appearance
+
+The original native **Classic** interface remains available. The optional
+**Monitor** design is a compact technical UI for dense tables, charts, maps,
+status indicators, logs, and configuration screens. Open
+**Settings → Appearance…** and choose **Dark**, **Light**, or
+**Follow system**. The selection is persisted, and Follow system reacts to
+Windows color-scheme changes while the application is running.
+
 ## Quick start
 
 1. Download the latest installer from

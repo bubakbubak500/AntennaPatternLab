@@ -1,7 +1,21 @@
 from pathlib import Path
+import tomllib
 
 
 ROOT = Path(__file__).parents[1]
+
+
+def test_release_version_is_036_everywhere():
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    package = (
+        ROOT / "src" / "antenna_pattern_lab" / "__init__.py"
+    ).read_text(encoding="utf-8")
+    installer = (
+        ROOT / "installer" / "AntennaPatternLab.iss"
+    ).read_text(encoding="utf-8")
+    assert metadata["project"]["version"] == "0.36.1"
+    assert '__version__ = "0.36.1"' in package
+    assert '#define MyAppVersion "0.36.1"' in installer
 
 
 def test_installer_preserves_user_data_and_can_sign_uninstaller():
@@ -45,3 +59,11 @@ def test_installer_uses_application_icon_and_fills_dependency_memo():
     assert "assets/app-icon.png" in spec
     assert 'AppUserModelID: "OK7PS.AntennaPatternLab"' in script
     assert 'IconFilename: "{app}\\AntennaPatternLab.ico"' in script
+
+
+def test_release_workflow_uses_notes_for_the_project_version():
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    assert '--notes-file "docs\\RELEASE_NOTES_$version.md"' in workflow
+    assert "RELEASE_NOTES_0.35.0.md" not in workflow

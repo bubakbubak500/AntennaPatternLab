@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .storage import SpotRepository
+from .theme import TOKENS, semantic_style
 
 
 TEXT = {
@@ -104,7 +105,7 @@ class CampaignAttachmentsDialog(QDialog):
         layout = QVBoxLayout(self)
         intro = QLabel(self.text["intro"])
         intro.setWordWrap(True)
-        intro.setStyleSheet("color: #57606a;")
+        intro.setStyleSheet(semantic_style("text_secondary"))
         layout.addWidget(intro)
 
         action_row = QHBoxLayout()
@@ -203,7 +204,11 @@ class CampaignAttachmentsDialog(QDialog):
                     item.setData(Qt.ItemDataRole.UserRole, attachment.id)
                 if column == 6:
                     item.setForeground(
-                        QColor("#1a7f37" if status == "ok" else "#cf222e")
+                        QColor(
+                            TOKENS.success
+                            if status == "ok"
+                            else TOKENS.danger_strong
+                        )
                     )
                 self.table.setItem(row, column, item)
         self.table.resizeColumnsToContents()

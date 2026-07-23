@@ -11,7 +11,7 @@ import time
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtCore import QObject, QSettings, Qt, QTimer, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -46,6 +46,7 @@ from .analysis import (
     time_normalized_sector_profile,
     trend_adjusted_sector_profile,
 )
+from .appearance_dialog import AppearanceDialog
 from .ab_dialog import AbComparisonDialog
 from .adif_io import import_adif
 from .campaign_dialog import CampaignDialog
@@ -82,6 +83,15 @@ from .rotator_safety import (
 from .setup_dialog import SetupDialog
 from .spot_map_dialog import SpotMapDialog
 from .settings_dialog import CommunicationSettings, CommunicationSettingsDialog
+from .theme import (
+    TOKENS,
+    DesignStyle,
+    ThemeController,
+    apply_figure_theme,
+    current_tokens,
+    monospace_font,
+    semantic_style,
+)
 from .update_dialog import UpdateDialog
 from .updates import DEFAULT_RELEASE_MANIFEST_URL, check_for_update
 from . import __version__
@@ -609,6 +619,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.repository = repository
         self.settings = settings or QSettings("OK7PS", "AntennaPatternLab")
+        self.theme_controller = ThemeController(self.settings, self)
         self.bridge = CollectorBridge()
         self.collector = PskReporterCollector(
             self.bridge.spot_received.emit,
@@ -666,6 +677,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QApplication.instance().windowIcon())
         self.resize(1180, 760)
         self._build_ui()
+        self.theme_controller.theme_changed.connect(self._theme_changed)
         self._connect_signals()
         self.wsjtx_listener.start()
         if bool(int(self.settings.value("hamlib_enabled", 0))):
@@ -679,13 +691,17 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         root = QWidget()
+        root.setObjectName("AppShell")
         layout = QVBoxLayout(root)
         layout.setContentsMargins(16, 12, 16, 12)
+        self._root_layout = layout
 
         title = QLabel("ANTENNA PATTERN LAB")
+        title.setObjectName("PanelHeader")
         title.setStyleSheet(
             "font-size: 20px; font-weight: 700; letter-spacing: 2px;"
         )
+        self._title = title
         self.subtitle = QLabel()
         layout.addWidget(title)
 
@@ -770,7 +786,7 @@ class MainWindow(QMainWindow):
         self.history_hours.setFixedWidth(68)
         self.history_button = QPushButton()
         self.clear_button = QPushButton()
-        self.clear_button.setStyleSheet("QPushButton { color: #b42318; }")
+        self.clear_button.setProperty("buttonRole", "danger")
 
         controls_layout.addWidget(self.callsign_label, 0, 0)
         controls_layout.addWidget(self.callsign, 0, 1)
@@ -792,6 +808,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(controls)
 
         chart_panel = QWidget()
+        chart_panel.setObjectName("DataPanel")
         chart_layout = QVBoxLayout(chart_panel)
         chart_layout.setContentsMargins(0, 0, 0, 0)
         chart_controls = QHBoxLayout()
@@ -808,7 +825,7 @@ class MainWindow(QMainWindow):
         saved_width = int(self.settings.value("sector_width", 10))
         self.sector_width.setCurrentIndex(max(0, self.sector_width.findData(saved_width)))
         self.graph_info = QLabel("ⓘ")
-        self.graph_info.setStyleSheet("color: #0969da; font-size: 17px; font-weight: 700;")
+        self.graph_info.setProperty("statusRole", "info")
         chart_controls.addWidget(self.graph_view_label)
         chart_controls.addWidget(self.graph_view, 1)
         chart_controls.addWidget(self.sector_width_label)
@@ -862,7 +879,9 @@ class MainWindow(QMainWindow):
         filter_controls.addWidget(self.source_filter)
         filter_controls.addStretch()
         chart_layout.addLayout(filter_controls)
-        self.figure = Figure(figsize=(6, 5), facecolor="#ffffff")
+        self.figure = Figure(
+            figsize=(6, 5), facecolor=current_tokens().panel_background
+        )
         self.canvas = FigureCanvasQTAgg(self.figure)
         self._graph_hover_data = []
         self._plot_annotation = None
@@ -871,12 +890,14 @@ class MainWindow(QMainWindow):
         self.canvas.mpl_connect("button_press_event", self._on_graph_click)
         chart_layout.addWidget(self.canvas, 1)
         self.graph_details = QTableWidget(0, 5)
+        self.graph_details.setObjectName("DataTable")
         self.graph_details.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.graph_details.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.graph_details.horizontalHeader().setStretchLastSection(True)
         self.graph_details.setMaximumHeight(155)
         chart_layout.addWidget(self.graph_details)
         self.table = QTableWidget(0, 8)
+        self.table.setObjectName("DataTable")
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -987,6 +1008,10 @@ class MainWindow(QMainWindow):
                 self.updates_action,
             ]
         )
+        self.settings_menu.addSeparator()
+        self.appearance_action = QAction(self)
+        self.appearance_action.triggered.connect(self._open_appearance_settings)
+        self.settings_menu.addAction(self.appearance_action)
 
         self.diagnostics_action = QAction(self)
         self.diagnostics_action.triggered.connect(self.diagnostics_button.click)
@@ -1052,12 +1077,65 @@ class MainWindow(QMainWindow):
         self._refresh_timer.timeout.connect(self.refresh)
 
     def _apply_theme(self) -> None:
-        # Use the platform palette and native controls. A window-wide custom
-        # stylesheet used to leak pale text into light modal dialogs.
+        tokens = self.theme_controller.tokens
+        monitor = self.theme_controller.design_style == DesignStyle.MONITOR
+        if not hasattr(self, "_classic_widget_fonts"):
+            self._classic_widget_fonts = [
+                (widget, QFont(widget.font()))
+                for widget in (
+                    self.callsign,
+                    self.tx_grid,
+                    self.history_hours,
+                    self.table,
+                    self.graph_details,
+                )
+            ]
         self.setPalette(QApplication.palette())
         self.setStyleSheet("")
-        self.live_button.setStyleSheet("font-weight: 700;")
-        self.clear_button.setStyleSheet("color: #b42318;")
+        if monitor:
+            self._root_layout.setContentsMargins(12, 8, 12, 8)
+            self._root_layout.setSpacing(6)
+            self._title.setStyleSheet(
+                f"font-size: {tokens.heading_font_px}px; "
+                "font-weight: 600; letter-spacing: 1px;"
+            )
+            self.live_button.setStyleSheet("font-weight: 600;")
+            for widget, _font in self._classic_widget_fonts:
+                widget.setFont(monospace_font())
+        else:
+            self._root_layout.setContentsMargins(16, 12, 16, 12)
+            self._root_layout.setSpacing(-1)
+            self._title.setStyleSheet(
+                "font-size: 20px; font-weight: 700; letter-spacing: 2px;"
+            )
+            self.live_button.setStyleSheet("font-weight: 700;")
+            for widget, font in self._classic_widget_fonts:
+                widget.setFont(font)
+        self.clear_button.setStyleSheet(semantic_style("danger"))
+        self.graph_info.setStyleSheet(
+            semantic_style(
+                "info",
+                bold=True,
+                size_px=tokens.heading_font_px if monitor else 17,
+            )
+        )
+        apply_figure_theme(self.figure)
+
+    def _theme_changed(self, _tokens) -> None:
+        self._apply_theme()
+        self.refresh()
+
+    def _open_appearance_settings(self) -> None:
+        dialog = AppearanceDialog(
+            self.theme_controller.design_style,
+            self.theme_controller.preference,
+            self.language_code,
+            self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        design_style, preference = dialog.values()
+        self.theme_controller.set_selection(design_style, preference)
 
     def toggle_collection(self) -> None:
         if self._collecting:
@@ -1306,6 +1384,8 @@ class MainWindow(QMainWindow):
     def refresh(self) -> None:
         located = self._located_spots()
         self._draw_profile(located)
+        apply_figure_theme(self.figure)
+        self.canvas.draw_idle()
         self._fill_table(located[:500])
         unique_rx = len({item.spot.rx_call for item in located})
         width_deg = int(self.sector_width.currentData() or 10)
@@ -1344,7 +1424,7 @@ class MainWindow(QMainWindow):
             self._draw_nec_chart()
             return
         axis = self.figure.add_subplot(111, projection="polar")
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         axis.set_theta_zero_location("N")
         axis.set_theta_direction(-1)
         receiver_metrics = []
@@ -1375,10 +1455,10 @@ class MainWindow(QMainWindow):
                 for sector in profile
             ]
         quality_colors = {
-            "none": "#d8dee4",
-            "low": "#8c959f",
-            "medium": "#0e7490",
-            "high": "#1a7f37",
+            "none": TOKENS.divider,
+            "low": TOKENS.text_muted,
+            "medium": TOKENS.accent_secondary,
+            "high": TOKENS.success,
         }
         bars = axis.bar(
             theta,
@@ -1528,7 +1608,7 @@ class MainWindow(QMainWindow):
                     [item[0] for item in interval_sectors],
                     [max(0.0, item[1].confidence_low_db + 30.0) for item in interval_sectors],
                     [max(0.0, item[1].confidence_high_db + 30.0) for item in interval_sectors],
-                    color="#57606a",
+                    color=TOKENS.text_secondary,
                     linewidth=1.2,
                     alpha=0.85,
                     zorder=5,
@@ -1551,7 +1631,7 @@ class MainWindow(QMainWindow):
             axis.plot(
                 outline_theta,
                 outline_radius,
-                color="#0f766e",
+                color=TOKENS.chart_series[0],
                 linewidth=2.4,
                 label=self._text("measured_outline"),
                 zorder=4,
@@ -1560,7 +1640,7 @@ class MainWindow(QMainWindow):
                 axis.fill(
                     outline_theta,
                     outline_radius,
-                    color="#19b7a5",
+                    color=TOKENS.chart_series[5],
                     alpha=0.15,
                     zorder=2,
                 )
@@ -1579,7 +1659,7 @@ class MainWindow(QMainWindow):
             axis.plot(
                 [angle, angle],
                 [0, reference_limit],
-                color="#9a6700",
+                color=TOKENS.warning,
                 linestyle="--",
                 linewidth=1.5,
                 label=self._text("profile_reference") if index == 0 else None,
@@ -1587,8 +1667,8 @@ class MainWindow(QMainWindow):
         if mode in ("snr", "normalized", "detrended", "receiver", "control"):
             axis.set_rlim(0, 40)
             axis.set_yticks([10, 20, 30, 40], labels=["−20", "−10", "0", "+10 dB"])
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.8)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.8)
         title = self._text("graph_titles")[mode]
         if mode == "receiver":
             counts = {
@@ -1611,27 +1691,27 @@ class MainWindow(QMainWindow):
                         control_group.reason_code
                     ]
                 )
-        axis.set_title(title, color="#1f2328", pad=20)
+        axis.set_title(title, color=TOKENS.text_primary, pad=20)
         if reference_bearings or mode in ("snr", "normalized", "detrended", "receiver", "control"):
             legend = axis.legend(loc="lower left", bbox_to_anchor=(-0.15, -0.12), fontsize=8)
             for text_item in legend.get_texts():
-                text_item.set_color("#1f2328")
-            legend.get_frame().set_facecolor("#ffffff")
+                text_item.set_color(TOKENS.text_primary)
+            legend.get_frame().set_facecolor(TOKENS.surface_1)
         self.figure.tight_layout()
         self._plot_annotation = axis.annotate(
             "",
             xy=(0, 0),
             xytext=(14, 14),
             textcoords="offset points",
-            bbox={"boxstyle": "round", "fc": "#f6f8fa", "ec": "#0969da"},
-            color="#1f2328",
+            bbox={"boxstyle": "round", "fc": TOKENS.surface_2, "ec": TOKENS.accent},
+            color=TOKENS.text_primary,
         )
         self._plot_annotation.set_visible(False)
         self.canvas.draw_idle()
 
     def _draw_model_chart(self) -> None:
         axis = self.figure.add_subplot(111, projection="polar")
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         axis.set_theta_zero_location("N")
         axis.set_theta_direction(-1)
         profile_id = self.antenna_profile.currentData()
@@ -1646,9 +1726,9 @@ class MainWindow(QMainWindow):
                 )
             except ValueError:
                 model = None
-        axis.set_title(self._text("graph_titles")["model"], color="#1f2328", pad=20)
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.8)
+        axis.set_title(self._text("graph_titles")["model"], color=TOKENS.text_primary, pad=20)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.8)
         axis.set_rlim(0, 30)
         axis.set_yticks([0, 10, 20, 30], labels=["−30", "−20", "−10", "0 dB"])
         if model is None:
@@ -1659,7 +1739,7 @@ class MainWindow(QMainWindow):
             )
             axis.text(
                 0.5, 0.5, message, transform=axis.transAxes, ha="center", va="center",
-                color="#57606a", wrap=True,
+                color=TOKENS.text_secondary, wrap=True,
             )
             self._set_graph_details([(message, "—", "—", "—", "")])
         else:
@@ -1667,8 +1747,8 @@ class MainWindow(QMainWindow):
             radius = [point.relative_gain_db + 30.0 for point in model.points]
             theta.append(theta[0])
             radius.append(radius[0])
-            axis.plot(theta, radius, color="#9a6700", linewidth=2.2)
-            axis.fill(theta, radius, color="#9a6700", alpha=0.18)
+            axis.plot(theta, radius, color=TOKENS.warning, linewidth=2.2)
+            axis.fill(theta, radius, color=TOKENS.warning, alpha=0.18)
             profile_spots = self.repository.list_spots_for_profile(
                 profile_id, band=self.band.currentText(), mode=self.mode.currentText()
             )
@@ -1682,16 +1762,16 @@ class MainWindow(QMainWindow):
                 axis.plot(
                     calibration_theta,
                     calibration_radius,
-                    color="#0969da",
+                    color=TOKENS.info,
                     linewidth=2.0,
                     linestyle="--",
                     marker="o",
                     label=self._text("model_calibration"),
                 )
                 legend = axis.legend(loc="upper right", fontsize=8)
-                legend.get_frame().set_facecolor("#ffffff")
+                legend.get_frame().set_facecolor(TOKENS.surface_1)
                 for text_item in legend.get_texts():
-                    text_item.set_color("#1f2328")
+                    text_item.set_color(TOKENS.text_primary)
             detail = "\n".join(
                 (
                     self._text("model_names")[model.model_name],
@@ -1701,8 +1781,8 @@ class MainWindow(QMainWindow):
             )
             axis.text(
                 0.02, 0.02, detail, transform=axis.transAxes, ha="left", va="bottom",
-                color="#57606a", fontsize=8,
-                bbox={"boxstyle": "round", "fc": "#f6f8fa", "ec": "#8c959f", "alpha": 0.95},
+                color=TOKENS.text_secondary, fontsize=8,
+                bbox={"boxstyle": "round", "fc": TOKENS.surface_2, "ec": TOKENS.text_muted, "alpha": 0.95},
             )
             self._set_graph_details(
                 [
@@ -1736,25 +1816,25 @@ class MainWindow(QMainWindow):
 
     def _draw_nec_chart(self) -> None:
         axis = self.figure.add_subplot(111, projection="polar")
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         axis.set_theta_zero_location("N")
         axis.set_theta_direction(-1)
-        axis.set_title(self._text("graph_titles")["nec"], color="#1f2328", pad=20)
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.8)
+        axis.set_title(self._text("graph_titles")["nec"], color=TOKENS.text_primary, pad=20)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.8)
         axis.set_rlim(0, 60)
         axis.set_yticks([0, 20, 40, 60], labels=["−60", "−40", "−20", "0 dB"])
         if self._nec_pattern is None:
             message = self._text("nec_no_data")
-            axis.text(0.5, 0.5, message, transform=axis.transAxes, ha="center", va="center", color="#57606a", wrap=True)
+            axis.text(0.5, 0.5, message, transform=axis.transAxes, ha="center", va="center", color=TOKENS.text_secondary, wrap=True)
             self._set_graph_details([(message, "—", "—", "—", "")])
         else:
             theta = [point.bearing_deg * pi / 180 for point in self._nec_pattern.points]
             radius = [point.relative_gain_db + 60.0 for point in self._nec_pattern.points]
             theta.append(theta[0])
             radius.append(radius[0])
-            axis.plot(theta, radius, color="#b388ff", linewidth=2.2)
-            axis.fill(theta, radius, color="#b388ff", alpha=0.16)
+            axis.plot(theta, radius, color=TOKENS.chart_series[3], linewidth=2.2)
+            axis.fill(theta, radius, color=TOKENS.chart_series[3], alpha=0.16)
             self._set_graph_details(
                 [
                     (f"{point.bearing_deg:.1f}°", f"{point.relative_gain_db:+.2f} dB", "—", "—", f"NEC {point.absolute_gain_db:+.2f} dB")
@@ -1767,15 +1847,15 @@ class MainWindow(QMainWindow):
 
     def _draw_time_chart(self, located) -> None:
         axis = self.figure.add_subplot(111)
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         ordered = sorted(located, key=lambda item: item.spot.observed_at)
         times = [item.spot.observed_at for item in ordered]
         snrs = [item.spot.snr_db for item in ordered]
         colors = [item.bearing_deg for item in ordered]
         scatter = axis.scatter(times, snrs, c=colors, cmap="hsv", vmin=0, vmax=360, s=18, alpha=0.75)
         colorbar = self.figure.colorbar(scatter, ax=axis, pad=0.02)
-        colorbar.set_label("Azimut / Bearing (°)", color="#1f2328")
-        colorbar.ax.tick_params(colors="#57606a")
+        colorbar.set_label("Azimut / Bearing (°)", color=TOKENS.text_primary)
+        colorbar.ax.tick_params(colors=TOKENS.chart_labels)
         labels = [
             f"{item.spot.observed_at.astimezone(timezone.utc):%Y-%m-%d %H:%M UTC}\n"
             f"{item.spot.rx_call} · {item.spot.snr_db:+d} dB · {item.bearing_deg:.0f}° · {item.distance_km:.0f} km\n"
@@ -1795,10 +1875,10 @@ class MainWindow(QMainWindow):
                 for item in ordered
             ]
         )
-        axis.set_title(self._text("graph_titles")["time"], color="#1f2328")
-        axis.set_ylabel("SNR (dB)", color="#1f2328")
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.8)
+        axis.set_title(self._text("graph_titles")["time"], color=TOKENS.text_primary)
+        axis.set_ylabel("SNR (dB)", color=TOKENS.text_primary)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.8)
         self.figure.autofmt_xdate()
         self.figure.tight_layout()
         self._plot_annotation = axis.annotate(
@@ -1806,15 +1886,15 @@ class MainWindow(QMainWindow):
             xy=(0, 0),
             xytext=(14, 14),
             textcoords="offset points",
-            bbox={"boxstyle": "round", "fc": "#f6f8fa", "ec": "#0969da"},
-            color="#1f2328",
+            bbox={"boxstyle": "round", "fc": TOKENS.surface_2, "ec": TOKENS.accent},
+            color=TOKENS.text_primary,
         )
         self._plot_annotation.set_visible(False)
         self.canvas.draw_idle()
 
     def _draw_receiver_map(self, located) -> None:
         axis = self.figure.add_subplot(111)
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         grouped = {}
         for item in located:
             key = (item.spot.rx_call, item.spot.rx_grid)
@@ -1844,7 +1924,7 @@ class MainWindow(QMainWindow):
             vmin=-25,
             vmax=10,
             alpha=0.85,
-            edgecolors="#ffffff",
+            edgecolors=TOKENS.panel_background,
             linewidths=0.5,
         )
         labels = [
@@ -1869,45 +1949,45 @@ class MainWindow(QMainWindow):
                 [tx_latitude],
                 marker="*",
                 s=130,
-                color="#b42318",
-                edgecolors="#ffffff",
+                color=TOKENS.danger,
+                edgecolors=TOKENS.panel_background,
                 linewidths=0.8,
                 label=self.callsign.text().strip().upper() or "TX",
                 zorder=5,
             )
             legend = axis.legend(loc="lower left")
-            legend.get_frame().set_facecolor("#ffffff")
+            legend.get_frame().set_facecolor(TOKENS.surface_1)
             for text_item in legend.get_texts():
-                text_item.set_color("#1f2328")
+                text_item.set_color(TOKENS.text_primary)
         except ValueError:
             pass
         colorbar = self.figure.colorbar(scatter, ax=axis, pad=0.02)
-        colorbar.set_label("Median SNR (dB)", color="#1f2328")
-        colorbar.ax.tick_params(colors="#57606a")
+        colorbar.set_label("Median SNR (dB)", color=TOKENS.text_primary)
+        colorbar.ax.tick_params(colors=TOKENS.chart_labels)
         axis.set_xlim(-180, 180)
         axis.set_ylim(-90, 90)
         axis.set_xticks(range(-180, 181, 60))
         axis.set_yticks(range(-90, 91, 30))
-        axis.set_xlabel("Longitude (°)", color="#1f2328")
-        axis.set_ylabel("Latitude (°)", color="#1f2328")
-        axis.set_title(self._text("graph_titles")["map"], color="#1f2328")
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.8)
+        axis.set_xlabel("Longitude (°)", color=TOKENS.text_primary)
+        axis.set_ylabel("Latitude (°)", color=TOKENS.text_primary)
+        axis.set_title(self._text("graph_titles")["map"], color=TOKENS.text_primary)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.8)
         self.figure.tight_layout()
         self._plot_annotation = axis.annotate(
             "",
             xy=(0, 0),
             xytext=(14, 14),
             textcoords="offset points",
-            bbox={"boxstyle": "round", "fc": "#f6f8fa", "ec": "#0969da"},
-            color="#1f2328",
+            bbox={"boxstyle": "round", "fc": TOKENS.surface_2, "ec": TOKENS.accent},
+            color=TOKENS.text_primary,
         )
         self._plot_annotation.set_visible(False)
         self.canvas.draw_idle()
 
     def _draw_exposure_chart(self) -> None:
         axis = self.figure.add_subplot(111, projection="polar")
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         axis.set_theta_zero_location("N")
         axis.set_theta_direction(-1)
         width_deg = int(self.sector_width.currentData() or 30)
@@ -1923,7 +2003,7 @@ class MainWindow(QMainWindow):
             theta,
             radius,
             width=max(1, width_deg - 1) * pi / 180,
-            color=["#1a7f37" if sector.opportunities >= 10 else "#8c959f" for sector in sectors],
+            color=[TOKENS.success if sector.opportunities >= 10 else TOKENS.text_muted for sector in sectors],
             alpha=0.82,
         )
         for sector, bar in zip(sectors, bars):
@@ -1965,22 +2045,22 @@ class MainWindow(QMainWindow):
                 [sector.center_deg * pi / 180 for sector in interval_sectors],
                 [sector.confidence_low * 100 for sector in interval_sectors],
                 [sector.confidence_high * 100 for sector in interval_sectors],
-                color="#57606a",
+                color=TOKENS.text_secondary,
                 linewidth=1.2,
             )
         axis.set_rlim(0, 100)
         axis.set_yticks([25, 50, 75, 100], labels=["25%", "50%", "75%", "100%"])
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.8)
-        axis.set_title(self._text("graph_titles")["exposure"], color="#1f2328", pad=20)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.8)
+        axis.set_title(self._text("graph_titles")["exposure"], color=TOKENS.text_primary, pad=20)
         self.figure.tight_layout()
         self._plot_annotation = axis.annotate(
             "",
             xy=(0, 0),
             xytext=(14, 14),
             textcoords="offset points",
-            bbox={"boxstyle": "round", "fc": "#f6f8fa", "ec": "#0969da"},
-            color="#1f2328",
+            bbox={"boxstyle": "round", "fc": TOKENS.surface_2, "ec": TOKENS.accent},
+            color=TOKENS.text_primary,
         )
         self._plot_annotation.set_visible(False)
         self.canvas.draw_idle()
@@ -2168,6 +2248,9 @@ class MainWindow(QMainWindow):
         self.communications_action.setText(self._text("communications"))
         self.external_tools_action.setText(self._text("external_tools"))
         self.updates_action.setText(self._text("updates"))
+        self.appearance_action.setText(
+            "Vzhled aplikace…" if self.language_code == "CZE" else "Appearance…"
+        )
         self.diagnostics_action.setText(self._text("diagnostics"))
         self.help_contents_action.setText(self._text("help_contents"))
         self.about_action.setText(self._text("about"))
@@ -2499,10 +2582,10 @@ class MainWindow(QMainWindow):
     def _set_connection_state(self, state: str, detail: str) -> None:
         self._connection_state = state if state in ("disconnected", "connecting", "connected", "error") else "error"
         colors = {
-            "disconnected": "#57606a",
-            "connecting": "#9a6700",
-            "connected": "#1a7f37",
-            "error": "#cf222e",
+            "disconnected": TOKENS.text_secondary,
+            "connecting": TOKENS.warning,
+            "connected": TOKENS.success,
+            "error": TOKENS.danger_strong,
         }
         label = self._text("connection")[self._connection_state]
         self.connection_indicator.setText(f"● MQTT: {label}")
@@ -2547,11 +2630,11 @@ class MainWindow(QMainWindow):
     def _render_wsjtx_indicator(self) -> None:
         state = self._wsjtx_connection_state
         colors = {
-            "disconnected": "#57606a",
-            "waiting": "#9a6700",
-            "connected": "#1a7f37",
-            "stale": "#bc4c00",
-            "error": "#cf222e",
+            "disconnected": TOKENS.text_secondary,
+            "waiting": TOKENS.warning,
+            "connected": TOKENS.success,
+            "stale": TOKENS.warning_strong,
+            "error": TOKENS.danger_strong,
         }
         label_key = self._wsjtx_operating_state if state == "connected" and self._wsjtx_operating_state else state
         labels = self._text("wsjtx")
@@ -2737,10 +2820,10 @@ class MainWindow(QMainWindow):
     def _render_hamlib_indicator(self) -> None:
         state = self._hamlib_connection_state
         colors = {
-            "disabled": "#57606a",
-            "connecting": "#9a6700",
-            "connected": "#1a7f37",
-            "error": "#cf222e",
+            "disabled": TOKENS.text_secondary,
+            "connecting": TOKENS.warning,
+            "connected": TOKENS.success,
+            "error": TOKENS.danger_strong,
         }
         label = self._text("hamlib_states").get(state, self._text("hamlib_states")["error"])
         self.hamlib_indicator.setText(f"● Hamlib: {label}")
@@ -2827,10 +2910,10 @@ class MainWindow(QMainWindow):
     def _render_rotator_indicator(self) -> None:
         state = self._rotator_connection_state
         colors = {
-            "disabled": "#57606a",
-            "connecting": "#9a6700",
-            "connected": "#1a7f37",
-            "error": "#cf222e",
+            "disabled": TOKENS.text_secondary,
+            "connecting": TOKENS.warning,
+            "connected": TOKENS.success,
+            "error": TOKENS.danger_strong,
         }
         labels = self._text("rotator_states")
         safety = self._rotator_safety
@@ -2849,9 +2932,9 @@ class MainWindow(QMainWindow):
             f"● {self._text('rotator_name')}: {label}{position}"
         )
         color = (
-            "#cf222e"
+            TOKENS.danger_strong
             if safety.severity == "error"
-            else "#bc4c00"
+            else TOKENS.warning_strong
             if safety.severity == "warning"
             else colors.get(state, colors["error"])
         )
@@ -2888,7 +2971,7 @@ class MainWindow(QMainWindow):
         if active is None:
             self.campaign_indicator.setText(self._text("campaign_none"))
             self.campaign_indicator.setStyleSheet(
-                "color: #57606a; font-weight: 700;"
+                f"color: {TOKENS.text_secondary}; font-weight: 700;"
             )
             self.campaign_indicator.setToolTip("")
             return
@@ -2909,7 +2992,7 @@ class MainWindow(QMainWindow):
             )
         )
         self.campaign_indicator.setStyleSheet(
-            f"color: {'#1a7f37' if progress.complete else '#9a6700'}; "
+            f"color: {TOKENS.success if progress.complete else TOKENS.warning}; "
             "font-weight: 700;"
         )
         self.campaign_indicator.setToolTip(

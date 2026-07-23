@@ -28,6 +28,7 @@ from .coverage import (
     priority_sectors,
 )
 from .measurement_planner import recommend_measurement_window
+from .theme import TOKENS, apply_figure_theme, semantic_style
 
 
 TEXT = {
@@ -238,13 +239,13 @@ class CoverageDialog(QDialog):
             self.text["priority"].format(targets=" · ".join(targets))
         )
         self.priority.setWordWrap(True)
-        self.priority.setStyleSheet("color: #0969da; font-weight: 700;")
+        self.priority.setStyleSheet(semantic_style("info", bold=True))
         layout.addWidget(self.priority)
 
         self.tabs = QTabWidget()
         self.angular_tab = QWidget()
         angular_layout = QVBoxLayout(self.angular_tab)
-        self.figure = Figure(figsize=(7, 5), facecolor="#ffffff")
+        self.figure = Figure(figsize=(7, 5), facecolor=TOKENS.panel_background)
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.table = QTableWidget(0, len(self.text["headers"]))
         self.table.setHorizontalHeaderLabels(self.text["headers"])
@@ -275,10 +276,10 @@ class CoverageDialog(QDialog):
             )
         )
         self.matrix_priority.setWordWrap(True)
-        self.matrix_priority.setStyleSheet("color: #0969da; font-weight: 700;")
+        self.matrix_priority.setStyleSheet(semantic_style("info", bold=True))
         matrix_layout.addWidget(self.matrix_priority)
         matrix_splitter = QSplitter(Qt.Orientation.Vertical)
-        self.matrix_figure = Figure(figsize=(9, 5), facecolor="#ffffff")
+        self.matrix_figure = Figure(figsize=(9, 5), facecolor=TOKENS.panel_background)
         self.matrix_canvas = FigureCanvasQTAgg(self.matrix_figure)
         self.matrix_table = QTableWidget(0, 13)
         self.matrix_table.setEditTriggers(
@@ -303,7 +304,7 @@ class CoverageDialog(QDialog):
 
         note = QLabel(self.text["note"])
         note.setWordWrap(True)
-        note.setStyleSheet("color: #57606a;")
+        note.setStyleSheet(semantic_style("text_secondary"))
         layout.addWidget(note)
         close_button = QPushButton(self.text["close"])
         close_button.clicked.connect(self.accept)
@@ -332,7 +333,7 @@ class CoverageDialog(QDialog):
             )
         )
         summary.setWordWrap(True)
-        summary.setStyleSheet("color: #0969da; font-weight: 700;")
+        summary.setStyleSheet(semantic_style("info", bold=True))
         planner_layout.addWidget(summary)
 
         bearings = ", ".join(
@@ -369,7 +370,7 @@ class CoverageDialog(QDialog):
         planner_layout.addWidget(rate)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
-        self.planner_figure = Figure(figsize=(9, 4), facecolor="#ffffff")
+        self.planner_figure = Figure(figsize=(9, 4), facecolor=TOKENS.panel_background)
         planner_canvas = FigureCanvasQTAgg(self.planner_figure)
         self.planner_table = QTableWidget(
             0, len(self.text["planner_headers"])
@@ -391,9 +392,9 @@ class CoverageDialog(QDialog):
         candidates = sorted(result.candidates, key=lambda item: item.solar_slot)
         axis = self.planner_figure.add_subplot(111)
         colors = [
-            "#1a7f37"
+            TOKENS.success
             if item.solar_slot == result.recommended.solar_slot
-            else "#54aeff"
+            else TOKENS.info_soft
             for item in candidates
         ]
         axis.bar(
@@ -409,6 +410,7 @@ class CoverageDialog(QDialog):
         axis.set_xlabel("Local solar time" if self.text is TEXT["ENG"] else "Místní sluneční čas")
         axis.set_title(self.text["planner_title"], fontsize=11)
         axis.grid(axis="y", alpha=0.25)
+        apply_figure_theme(self.planner_figure)
         self.planner_figure.tight_layout()
         planner_canvas.draw_idle()
 
@@ -432,13 +434,13 @@ class CoverageDialog(QDialog):
 
         note = QLabel(self.text["planner_note"])
         note.setWordWrap(True)
-        note.setStyleSheet("color: #57606a;")
+        note.setStyleSheet(semantic_style("text_secondary"))
         planner_layout.addWidget(note)
         self.tabs.addTab(self.planner_tab, self.text["planner_tab"])
 
     def _draw(self) -> None:
         axis = self.figure.add_subplot(111, projection="polar")
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         axis.set_theta_zero_location("N")
         axis.set_theta_direction(-1)
         theta = [sector.center_deg * pi / 180 for sector in self.sectors]
@@ -447,16 +449,16 @@ class CoverageDialog(QDialog):
             theta,
             [100] * len(self.sectors),
             width=width,
-            color="#eaeef2",
-            edgecolor="#d0d7de",
+            color=TOKENS.surface_3,
+            edgecolor=TOKENS.chart_grid,
             linewidth=0.6,
             zorder=1,
         )
         colors = {
-            "none": "#8c959f",
-            "low": "#cf222e",
-            "medium": "#bf8700",
-            "high": "#1a7f37",
+            "none": TOKENS.text_muted,
+            "low": TOKENS.danger_strong,
+            "medium": TOKENS.warning_chart,
+            "high": TOKENS.success,
         }
         axis.bar(
             theta,
@@ -468,9 +470,10 @@ class CoverageDialog(QDialog):
         )
         axis.set_rlim(0, 100)
         axis.set_yticks((25, 50, 75, 100), labels=("25%", "50%", "75%", "100%"))
-        axis.tick_params(colors="#57606a")
-        axis.grid(color="#d0d7de", alpha=0.75)
-        axis.set_title(self.text["chart"], color="#1f2328", pad=18)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(color=TOKENS.chart_grid, alpha=0.75)
+        axis.set_title(self.text["chart"], color=TOKENS.text_primary, pad=18)
+        apply_figure_theme(self.figure)
         self.figure.tight_layout()
         self.canvas.draw_idle()
 
@@ -556,7 +559,7 @@ class CoverageDialog(QDialog):
                         ha="center",
                         va="center",
                         fontsize=7,
-                        color="#ffffff" if value < 35 else "#1f2328",
+                        color=TOKENS.text_inverse if value < 35 else TOKENS.text_primary,
                     )
         colorbar_axis = self.matrix_figure.add_axes((0.90, 0.18, 0.018, 0.64))
         self.matrix_figure.colorbar(
@@ -571,6 +574,7 @@ class CoverageDialog(QDialog):
             top=0.92,
             hspace=0.55,
         )
+        apply_figure_theme(self.matrix_figure)
         self.matrix_canvas.draw_idle()
 
     def _fill_matrix_table(self) -> None:

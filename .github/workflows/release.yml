@@ -99,6 +99,6 @@ jobs:
             "release\release-manifest.json" `
             "release\SHA256SUMS.txt" `
             --title "Antenna Pattern Lab $version" `
-            --notes-file "docs\RELEASE_NOTES_0.35.0.md" `
+            --notes-file "docs\RELEASE_NOTES_$version.md" `
             --latest `
             --verify-tag

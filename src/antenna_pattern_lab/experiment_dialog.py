@@ -29,6 +29,7 @@ from .experiments import (
 from .analysis import locate_spot
 from .rotator_alignment import analyze_rotator_alignment
 from .storage import SpotRepository
+from .theme import TOKENS, apply_figure_theme, semantic_style
 
 
 TEXT = {
@@ -184,7 +185,7 @@ class ExperimentDialog(QDialog):
         self.plan_button = QPushButton(self.text["plan"])
         self.plan_result = QLabel()
         self.plan_result.setWordWrap(True)
-        self.plan_result.setStyleSheet("color: #0969da;")
+        self.plan_result.setStyleSheet(semantic_style("info"))
         planner_row.addWidget(self.plan_button)
         planner_row.addWidget(self.plan_result, 1)
         layout.addLayout(planner_row)
@@ -205,7 +206,7 @@ class ExperimentDialog(QDialog):
         layout.addWidget(self.alignment_table)
         note = QLabel(self.text["note"])
         note.setWordWrap(True)
-        note.setStyleSheet("color: #9a6700;")
+        note.setStyleSheet(semantic_style("warning"))
         layout.addWidget(note)
         self.protocol_status = QLabel(self.text["idle"])
         self.protocol_status.setStyleSheet("font-size: 16px; font-weight: 700;")
@@ -223,7 +224,7 @@ class ExperimentDialog(QDialog):
         buttons.addStretch()
         buttons.addWidget(close_button)
         layout.addLayout(buttons)
-        self.figure = Figure(figsize=(8, 3.6), facecolor="#ffffff")
+        self.figure = Figure(figsize=(8, 3.6), facecolor=TOKENS.panel_background)
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.canvas.setMinimumHeight(260)
         self.table = QTableWidget(0, 10)
@@ -479,11 +480,11 @@ class ExperimentDialog(QDialog):
     def _draw_timeline(self, sessions) -> None:
         self.figure.clear()
         axis = self.figure.add_subplot(111)
-        axis.set_facecolor("#ffffff")
+        axis.set_facecolor(TOKENS.panel_background)
         now = datetime.now(timezone.utc)
         for index, session in enumerate(reversed(sessions[:50])):
             end = session.ended_at or now
-            color = "#1a7f37" if session.quality_score >= 80 else "#9a6700" if session.quality_score >= 50 else "#b42318"
+            color = TOKENS.success if session.quality_score >= 80 else TOKENS.warning if session.quality_score >= 50 else TOKENS.danger
             axis.plot(
                 [session.started_at, end],
                 [index, index],
@@ -491,10 +492,11 @@ class ExperimentDialog(QDialog):
                 linewidth=6,
                 solid_capstyle="round",
             )
-        axis.set_title(self.text["timeline"], color="#1f2328")
+        axis.set_title(self.text["timeline"], color=TOKENS.text_primary)
         axis.set_yticks([])
-        axis.tick_params(colors="#57606a")
-        axis.grid(axis="x", color="#d0d7de", alpha=0.8)
+        axis.tick_params(colors=TOKENS.chart_labels)
+        axis.grid(axis="x", color=TOKENS.chart_grid, alpha=0.8)
+        apply_figure_theme(self.figure)
         if sessions:
             self.figure.autofmt_xdate(rotation=20, ha="right")
         self.figure.tight_layout(pad=1.5)

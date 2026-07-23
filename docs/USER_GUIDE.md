@@ -97,7 +97,14 @@ to the wider passive PSK Reporter dataset.
 
 CSV export can be used for independent analysis or archival.
 
-## 9. Updates
+## 9. Appearance
+
+Open **Settings → Appearance…** to retain the native **Classic** interface or
+enable the compact **Monitor** design. Monitor provides **Dark**, **Light**, and
+**Follow system** themes. The preference is saved automatically. Follow system
+tracks Windows color-scheme changes while the application remains open.
+
+## 10. Updates
 
 Open **Settings → Updates** to check the official GitHub release channel. Automatic
 checks run in the background on every startup. If the internet or GitHub is
@@ -115,7 +122,7 @@ Current releases are not Authenticode-signed, so Windows may report an unknown
 publisher or show a SmartScreen warning. Download only from the official GitHub
 Releases page and compare the installer with the published SHA-256 checksum.
 
-## 10. Diagnostics and data
+## 11. Diagnostics and data
 
 Application data is stored outside the installation directory and is preserved by
 an in-place upgrade. The diagnostics export helps with support requests but should
