@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import zipfile
 
 import pytest
 
@@ -8,6 +9,7 @@ from antenna_pattern_lab.external_install import (
     ReleaseAsset,
     download_release_asset,
     fetch_release_asset,
+    install_opennec_archive,
     launch_installer,
 )
 
@@ -70,6 +72,44 @@ def test_fetch_release_asset_rejects_unverified_or_nonofficial_asset():
         )
 
 
+def test_fetch_release_asset_selects_opennec_windows_portable_package():
+    content = b"portable package"
+    digest = hashlib.sha256(content).hexdigest()
+    metadata = {
+        "tag_name": "v.2.2.0",
+        "draft": False,
+        "prerelease": False,
+        "assets": [
+            {
+                "name": "onec-windows-x86_64-openblas.zip",
+                "state": "uploaded",
+                "browser_download_url": (
+                    "https://github.com/maurymarkowitz/OpenNEC/releases/download/"
+                    "v.2.2.0/onec-windows-x86_64-openblas.zip"
+                ),
+                "digest": f"sha256:{digest}",
+                "size": len(content),
+            },
+            {
+                "name": "onec-windows-x86_64.zip",
+                "state": "uploaded",
+                "browser_download_url": (
+                    "https://github.com/maurymarkowitz/OpenNEC/releases/download/"
+                    "v.2.2.0/onec-windows-x86_64.zip"
+                ),
+                "digest": f"sha256:{digest}",
+                "size": len(content),
+            },
+        ],
+    }
+    asset = fetch_release_asset(
+        "opennec",
+        opener=lambda *_args, **_kwargs: Response(json.dumps(metadata).encode()),
+    )
+    assert asset.version == "2.2.0"
+    assert asset.filename == "onec-windows-x86_64.zip"
+
+
 def test_download_release_asset_is_atomic_and_verifies_sha256(tmp_path):
     content = b"verified installer bytes"
     asset = ReleaseAsset(
@@ -123,3 +163,28 @@ def test_launch_installer_uses_windows_shell_so_uac_can_be_shown(tmp_path):
 
     with pytest.raises(OSError, match="code 31"):
         launch_installer(installer, shell_execute=lambda _path: 31)
+
+
+def test_installs_opennec_zip_into_separate_directory(tmp_path):
+    archive = tmp_path / "onec-windows-x86_64.zip"
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr("bin/onec.exe", b"MZ")
+        package.writestr("docs/README.md", b"OpenNEC")
+    destination = tmp_path / "Programs" / "OpenNEC"
+
+    executable = install_opennec_archive(archive, destination)
+
+    assert executable == destination / "bin" / "onec.exe"
+    assert executable.read_bytes() == b"MZ"
+    assert (destination / "docs" / "README.md").is_file()
+
+
+def test_opennec_zip_install_rejects_path_traversal(tmp_path):
+    archive = tmp_path / "onec-windows-x86_64.zip"
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr("../outside.exe", b"MZ")
+        package.writestr("bin/onec.exe", b"MZ")
+
+    with pytest.raises(ValueError, match="unsafe path"):
+        install_opennec_archive(archive, tmp_path / "Programs" / "OpenNEC")
+    assert not (tmp_path / "outside.exe").exists()

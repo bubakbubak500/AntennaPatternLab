@@ -10,6 +10,7 @@ from typing import Callable, Mapping
 
 HAMLIB_RELEASES_URL = "https://github.com/Hamlib/Hamlib/releases/latest"
 WSJTX_DOWNLOADS_URL = "https://wsjtx.github.io/wsjtx/downloads.html"
+OPENNEC_RELEASES_URL = "https://github.com/maurymarkowitz/OpenNEC/releases/latest"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +38,7 @@ class HamlibRigModel:
 def detect_external_tools(
     environment: Mapping[str, str] | None = None,
     which: Callable[..., str | None] = shutil.which,
-) -> tuple[DependencyStatus, DependencyStatus]:
+) -> tuple[DependencyStatus, ...]:
     """Detect tools without executing them or modifying the system."""
     env = {
         key.casefold(): value
@@ -82,10 +83,41 @@ def detect_external_tools(
             ("SystemDrive", "WSJT", "wsjtx", "bin", "wsjtx.exe"),
         ),
     )
+    opennec = _find_executable(
+        "onec.exe",
+        env,
+        which,
+        relative_candidates=(
+            ("ProgramFiles", "OpenNEC", "bin", "onec.exe"),
+            ("ProgramFiles", "OpenNEC", "onec.exe"),
+            ("ProgramFiles(x86)", "OpenNEC", "bin", "onec.exe"),
+            ("ProgramFiles(x86)", "OpenNEC", "onec.exe"),
+            ("LOCALAPPDATA", "Programs", "OpenNEC", "bin", "onec.exe"),
+            ("LOCALAPPDATA", "Programs", "OpenNEC", "onec.exe"),
+        ),
+    )
     return (
         DependencyStatus("hamlib", "Hamlib rigctld", hamlib is not None, hamlib, HAMLIB_RELEASES_URL),
         DependencyStatus("wsjtx", "WSJT-X", wsjtx is not None, wsjtx, WSJTX_DOWNLOADS_URL),
+        DependencyStatus(
+            "opennec",
+            "OpenNEC (NEC-2 solver)",
+            opennec is not None,
+            opennec,
+            OPENNEC_RELEASES_URL,
+        ),
     )
+
+
+def detect_opennec(
+    environment: Mapping[str, str] | None = None,
+    which: Callable[..., str | None] = shutil.which,
+) -> Path | None:
+    """Return the detected standalone OpenNEC executable, without running it."""
+    for status in detect_external_tools(environment, which):
+        if status.key == "opennec":
+            return status.executable
+    return None
 
 
 def _find_executable(

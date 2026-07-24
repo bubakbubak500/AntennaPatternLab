@@ -7,8 +7,10 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+from dataclasses import dataclass
 from typing import Iterable
 
+from .antenna_model import AntennaModel
 from .campaigns import CampaignAttachment, CampaignLogEntry, MeasurementCampaign
 from .domain import Spot
 from .experiments import TxSessionSummary
@@ -22,6 +24,30 @@ from .propagation_analysis import (
     PropagationRecord,
     analyze_campaign_conditions,
 )
+from .nec_runner import NecRunResult
+
+
+@dataclass(frozen=True, slots=True)
+class StoredAntennaModel:
+    id: int
+    name: str
+    revision: int
+    predecessor_id: int | None
+    model_sha256: str
+    model: AntennaModel
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class StoredNecRun:
+    id: int
+    model_id: int
+    campaign_id: int | None
+    purpose: str
+    label: str
+    result: NecRunResult
+    validation_json: str
+    created_at: datetime
 
 
 class DatabaseMigrationError(RuntimeError):
@@ -30,7 +56,7 @@ class DatabaseMigrationError(RuntimeError):
 
 class SpotRepository:
     MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
     BACKUP_RETENTION = 5
 
     def __init__(self, database_path: str | Path):
@@ -327,6 +353,51 @@ class SpotRepository:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS nec_models (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    predecessor_id INTEGER,
+                    schema TEXT NOT NULL,
+                    model_sha256 TEXT NOT NULL UNIQUE,
+                    model_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS nec_model_name_idx "
+                "ON nec_models(name COLLATE NOCASE, revision DESC)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS nec_runs (
+                    id INTEGER PRIMARY KEY,
+                    model_id INTEGER NOT NULL,
+                    campaign_id INTEGER,
+                    purpose TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    schema TEXT NOT NULL,
+                    model_sha256 TEXT NOT NULL,
+                    input_sha256 TEXT NOT NULL,
+                    output_sha256 TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    validation_json TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    UNIQUE(model_id, output_sha256, purpose)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS nec_run_model_idx "
+                "ON nec_runs(model_id, created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS nec_run_campaign_idx "
+                "ON nec_runs(campaign_id, created_at DESC)"
+            )
             connection.execute(f"PRAGMA user_version = {self.SCHEMA_VERSION}")
 
     @property
@@ -482,6 +553,165 @@ class SpotRepository:
                 ),
             )
             return cursor.rowcount == 1
+
+    def save_nec_model(self, model: AntennaModel) -> StoredAntennaModel:
+        errors = [issue.message for issue in model.validate() if issue.severity == "error"]
+        if errors:
+            raise ValueError("Cannot save invalid antenna model: " + "; ".join(errors))
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            existing = connection.execute(
+                "SELECT * FROM nec_models WHERE model_sha256 = ?",
+                (model.sha256,),
+            ).fetchone()
+            if existing is None:
+                latest = connection.execute(
+                    """
+                    SELECT id, revision FROM nec_models
+                    WHERE name = ? COLLATE NOCASE
+                    ORDER BY revision DESC LIMIT 1
+                    """,
+                    (model.name,),
+                ).fetchone()
+                revision = 1 if latest is None else int(latest["revision"]) + 1
+                predecessor_id = None if latest is None else int(latest["id"])
+                cursor = connection.execute(
+                    """
+                    INSERT INTO nec_models (
+                        name, revision, predecessor_id, schema, model_sha256,
+                        model_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        model.name,
+                        revision,
+                        predecessor_id,
+                        model.schema,
+                        model.sha256,
+                        model.canonical_json(),
+                        now.isoformat(),
+                    ),
+                )
+                model_id = int(cursor.lastrowid)
+            else:
+                model_id = int(existing["id"])
+        return self.get_nec_model(model_id)
+
+    def get_nec_model(self, model_id: int) -> StoredAntennaModel:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM nec_models WHERE id = ?", (model_id,)
+            ).fetchone()
+        if row is None:
+            raise ValueError("Antenna model does not exist.")
+        return _row_to_nec_model(row)
+
+    def list_nec_models(self, *, latest_only: bool = True) -> list[StoredAntennaModel]:
+        with self._connect() as connection:
+            if latest_only:
+                rows = connection.execute(
+                    """
+                    SELECT model.* FROM nec_models model
+                    WHERE model.revision = (
+                        SELECT MAX(other.revision) FROM nec_models other
+                        WHERE other.name = model.name COLLATE NOCASE
+                    )
+                    ORDER BY model.name COLLATE NOCASE
+                    """
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM nec_models ORDER BY name COLLATE NOCASE, revision DESC"
+                ).fetchall()
+        return [_row_to_nec_model(row) for row in rows]
+
+    def save_nec_run(
+        self,
+        model_id: int,
+        result: NecRunResult,
+        *,
+        campaign_id: int | None = None,
+        purpose: str = "independent_baseline",
+        label: str = "",
+        validation_json: str = "",
+    ) -> StoredNecRun:
+        if purpose not in {"independent_baseline", "assisted_candidate"}:
+            raise ValueError("Unknown NEC run purpose.")
+        model = self.get_nec_model(model_id)
+        if model.model_sha256 != result.model_sha256:
+            raise ValueError("NEC result does not match the saved model revision.")
+        if campaign_id is not None:
+            self.get_campaign(campaign_id)
+        now = datetime.now(timezone.utc)
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO nec_runs (
+                    model_id, campaign_id, purpose, label, schema, model_sha256,
+                    input_sha256, output_sha256, result_json, validation_json,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(model_id, output_sha256, purpose) DO UPDATE SET
+                    campaign_id = excluded.campaign_id,
+                    label = excluded.label,
+                    validation_json = excluded.validation_json
+                """,
+                (
+                    model_id,
+                    campaign_id,
+                    purpose,
+                    label.strip(),
+                    result.schema,
+                    result.model_sha256,
+                    result.input_sha256,
+                    result.output_sha256,
+                    result.canonical_json(),
+                    validation_json,
+                    now.isoformat(),
+                ),
+            )
+            row = connection.execute(
+                """
+                SELECT id FROM nec_runs
+                WHERE model_id = ? AND output_sha256 = ? AND purpose = ?
+                """,
+                (model_id, result.output_sha256, purpose),
+            ).fetchone()
+        return self.get_nec_run(int(row["id"]))
+
+    def get_nec_run(self, run_id: int) -> StoredNecRun:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM nec_runs WHERE id = ?", (run_id,)
+            ).fetchone()
+        if row is None:
+            raise ValueError("NEC result does not exist.")
+        return _row_to_nec_run(row)
+
+    def list_nec_runs(
+        self,
+        *,
+        model_id: int | None = None,
+        campaign_id: int | None = None,
+        purpose: str | None = None,
+    ) -> list[StoredNecRun]:
+        clauses: list[str] = []
+        values: list[object] = []
+        for column, value in (
+            ("model_id", model_id),
+            ("campaign_id", campaign_id),
+            ("purpose", purpose),
+        ):
+            if value is not None:
+                clauses.append(f"{column} = ?")
+                values.append(value)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM nec_runs{where} ORDER BY created_at DESC",
+                values,
+            ).fetchall()
+        return [_row_to_nec_run(row) for row in rows]
 
     def add_many(self, spots: Iterable[Spot]) -> int:
         return sum(self.add(spot) for spot in spots)
@@ -1574,6 +1804,35 @@ def _row_to_campaign_attachment(row: sqlite3.Row) -> CampaignAttachment:
         sha256=row["sha256"],
         added_at=datetime.fromisoformat(row["added_at"]),
         notes=row["notes"],
+    )
+
+
+def _row_to_nec_model(row: sqlite3.Row) -> StoredAntennaModel:
+    return StoredAntennaModel(
+        id=int(row["id"]),
+        name=str(row["name"]),
+        revision=int(row["revision"]),
+        predecessor_id=(
+            None if row["predecessor_id"] is None else int(row["predecessor_id"])
+        ),
+        model_sha256=str(row["model_sha256"]),
+        model=AntennaModel.from_json(str(row["model_json"])),
+        created_at=datetime.fromisoformat(str(row["created_at"])),
+    )
+
+
+def _row_to_nec_run(row: sqlite3.Row) -> StoredNecRun:
+    return StoredNecRun(
+        id=int(row["id"]),
+        model_id=int(row["model_id"]),
+        campaign_id=(
+            None if row["campaign_id"] is None else int(row["campaign_id"])
+        ),
+        purpose=str(row["purpose"]),
+        label=str(row["label"]),
+        result=NecRunResult.from_json(str(row["result_json"])),
+        validation_json=str(row["validation_json"]),
+        created_at=datetime.fromisoformat(str(row["created_at"])),
     )
 
 

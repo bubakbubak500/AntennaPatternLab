@@ -18,16 +18,25 @@ For useful comparisons:
 
 ## 2. First run
 
-The first-run assistant checks for WSJT-X and Hamlib. If a tool is missing, the
-assistant can offer its official stable Windows release. Download and launch are
-two separate confirmations. The file is accepted only when its name, host, size,
-and published SHA-256 match the release metadata.
+The first-run assistant checks for WSJT-X, Hamlib, and the optional OpenNEC
+NEC-2 solver. If a tool is missing, the assistant can offer its official stable
+Windows release. Download and installation or launch require separate
+confirmations. The file is accepted only when its name, host, size, and
+published SHA-256 match the release metadata.
 
-You can skip either dependency:
+You can skip any dependency:
 
 - WSJT-X is needed for live TX/RX session awareness;
 - Hamlib is optional and adds radio frequency, mode, and PTT state;
-- demo data and file import work without either tool.
+- OpenNEC is optional and will provide calculations for the antenna-modeling
+  workbench; imported NEC output remains usable without it;
+- demo data, measurement analysis, and file import work without these tools.
+
+OpenNEC is downloaded from its official GitHub release and unpacked into the
+separate per-user `Programs/OpenNEC` directory. It remains an independent MIT
+licensed command-line tool. Antenna Pattern Lab does not import or link its
+solver library; it only detects `onec.exe` and will exchange standard `.nec`
+input and `.out` result files when the modeling workbench is available.
 
 When Hamlib is installed, **Settings → External tools** reads the model IDs,
 manufacturers, radio names, and backend status directly from that installed
@@ -178,7 +187,42 @@ controlled A/B experiment; the application does not automatically claim a
 building, terrain, common-mode current, orientation, or ground model as its
 cause.
 
-## 10. Import and export
+## 10. Antenna Modeling · NEC2 Workbench
+
+Open **Tools → Antenna modeling (NEC2)**. The workbench owns a versioned,
+solver-independent wire model; OpenNEC is only an optional standalone
+calculation process. Without OpenNEC you can still create, validate, save, and
+import/export models and inspect previously saved results.
+
+Start with **Dipole**, **Inverted-V**, **Vertical**, **Loop**, or **Yagi**.
+Edit wire endpoints, odd segment counts, radii, source segment, series RLC
+loads, ground parameters, orientation, and the frequency sweep in the table.
+**Refresh preview** validates missing/duplicate tags, zero-length or overly
+thick wires, coarse segmentation, invalid sources/loads, below-ground geometry,
+and approximate crossings before a solver is started.
+
+**Calculate baseline** writes a temporary `.nec` deck, runs the detected
+`onec.exe` as a cancellable child process, reads its `.out`, and then removes
+the temporary directory. The stored result contains the exact model revision,
+engine path/version, UTC time, command parameters, input/output SHA-256, and
+normal NEC output. The result tabs show R/X and 50 Ω SWR over frequency, wire
+currents, peak and front/back values, selectable absolute/relative azimuth and
+elevation cuts, and a mouse-rotatable 3D far-field surface.
+
+Saved independent baselines automatically appear in **Propagation
+Intelligence → Three layers**, next to raw observed coverage and the separate
+propagation-normalized estimate. **Assisted variants** solve explicit
+height/ground combinations separately. Orientation selection uses only the
+training time blocks and always reports error on later, previously unused
+campaign blocks; it never replaces the original independent baseline.
+
+Version 0.42.0 intentionally supports a documented NEC2 subset: `GW`, `GE`,
+`GN`, voltage `EX 0`, series-RLC `LD 0`, linear `FR`, and the generated `RP`.
+Unsupported cards are refused instead of silently discarded. Patches,
+buildings, volumetric solids, a real coax/feed-line model, full terrain,
+NEC4 extensions, and an unconstrained optimizer are outside this release.
+
+## 11. Import and export
 
 Use **Data → Import data** for CSV, ADI, or ADIF files. In a completed QSO,
 `RST_RCVD` is interpreted as the report the remote station sent about your signal.
@@ -187,14 +231,14 @@ to the wider passive PSK Reporter dataset.
 
 CSV export can be used for independent analysis or archival.
 
-## 11. Appearance
+## 12. Appearance
 
 Open **Settings → Appearance…** to retain the native **Classic** interface or
 enable the compact **Monitor** design. Monitor provides **Dark**, **Light**, and
 **Follow system** themes. The preference is saved automatically. Follow system
 tracks Windows color-scheme changes while the application remains open.
 
-## 12. Updates
+## 13. Updates
 
 Open **Settings → Updates** to check the official GitHub release channel. Automatic
 checks run in the background on every startup. If the internet or GitHub is

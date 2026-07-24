@@ -7,21 +7,28 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
+import stat
+import tempfile
 from typing import Callable
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+import zipfile
 
 
 API_URLS = {
     "hamlib": "https://api.github.com/repos/Hamlib/Hamlib/releases/latest",
     "wsjtx": "https://api.github.com/repos/WSJTX/wsjtx/releases/latest",
+    "opennec": "https://api.github.com/repos/maurymarkowitz/OpenNEC/releases/latest",
 }
 ASSET_PATTERNS = {
     "hamlib": re.compile(r"^hamlib-w64-[0-9][A-Za-z0-9._-]*\.exe$", re.IGNORECASE),
     "wsjtx": re.compile(r"^wsjtx-[0-9][A-Za-z0-9._-]*-win64\.exe$", re.IGNORECASE),
+    "opennec": re.compile(r"^onec-windows-x86_64\.zip$", re.IGNORECASE),
 }
 MAX_METADATA_BYTES = 2 * 1024 * 1024
 MAX_INSTALLER_BYTES = 300 * 1024 * 1024
+MAX_ARCHIVE_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 DOWNLOAD_HOSTS = {
     "github.com",
     "objects.githubusercontent.com",
@@ -83,7 +90,7 @@ def fetch_release_asset(
         None,
     )
     if asset is None:
-        raise ValueError("No official x64 Windows installer was found.")
+        raise ValueError("No official x64 Windows package was found.")
     filename = str(asset["name"])
     download_url = str(asset["browser_download_url"])
     _validate_download_url(download_url)
@@ -95,7 +102,7 @@ def fetch_release_asset(
         raise ValueError("Installer size is outside the allowed range.")
     return ReleaseAsset(
         key=key,
-        version=str(data.get("tag_name") or data.get("name") or "").lstrip("v"),
+        version=str(data.get("tag_name") or data.get("name") or "").lstrip("v."),
         filename=filename,
         download_url=download_url,
         sha256=digest.split(":", 1)[1].lower(),
@@ -182,3 +189,79 @@ def launch_installer(
     result = shell_execute(resolved)
     if result <= 32:
         raise OSError(f"Windows ShellExecute failed with code {result}.")
+
+
+def install_opennec_archive(archive: Path, destination: Path) -> Path:
+    """Install a verified OpenNEC ZIP as a separate per-user tool.
+
+    The archive is extracted into a staging directory and becomes visible only
+    after its expected executable has been found. Existing installations are
+    retained until that atomic replacement succeeds.
+    """
+
+    resolved_archive = Path(archive).resolve(strict=True)
+    if resolved_archive.suffix.lower() != ".zip":
+        raise ValueError("OpenNEC must be installed from its official ZIP package.")
+    destination = Path(destination).resolve()
+    if destination.parent == destination or not destination.name:
+        raise ValueError("OpenNEC installation destination is invalid.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(prefix=".opennec-staging-", dir=destination.parent)
+    )
+    backup: Path | None = None
+    try:
+        total_size = 0
+        with zipfile.ZipFile(resolved_archive) as source:
+            for member in source.infolist():
+                normalized = member.filename.replace("\\", "/")
+                parts = tuple(
+                    part
+                    for part in normalized.split("/")
+                    if part not in ("", ".")
+                )
+                if not parts or normalized.startswith("/") or ".." in parts:
+                    raise ValueError("OpenNEC archive contains an unsafe path.")
+                mode = member.external_attr >> 16
+                if stat.S_ISLNK(mode):
+                    raise ValueError(
+                        "OpenNEC archive contains an unsupported symbolic link."
+                    )
+                total_size += member.file_size
+                if total_size > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+                    raise ValueError("OpenNEC archive is unexpectedly large.")
+                target = staging.joinpath(*parts)
+                if member.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with source.open(member) as input_file, target.open(
+                    "wb"
+                ) as output_file:
+                    shutil.copyfileobj(input_file, output_file)
+
+        staged_executable = staging / "bin" / "onec.exe"
+        if not staged_executable.is_file():
+            raise ValueError("OpenNEC archive does not contain bin/onec.exe.")
+
+        if destination.exists():
+            backup = Path(
+                tempfile.mkdtemp(prefix=".opennec-backup-", dir=destination.parent)
+            )
+            backup.rmdir()
+            destination.replace(backup)
+        try:
+            staging.replace(destination)
+        except Exception:
+            if backup is not None and backup.exists() and not destination.exists():
+                backup.replace(destination)
+            raise
+        if backup is not None:
+            shutil.rmtree(backup)
+            backup = None
+        return destination / "bin" / "onec.exe"
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+        if backup is not None and backup.exists() and destination.exists():
+            shutil.rmtree(backup)

@@ -32,6 +32,7 @@ from .dependencies import (
 from .external_install import (
     download_release_asset,
     fetch_release_asset,
+    install_opennec_archive,
     launch_installer,
 )
 from .theme import semantic_style
@@ -40,19 +41,26 @@ from .theme import semantic_style
 TEXT = {
     "CZE": {
         "title": "První spuštění a externí nástroje",
-        "intro": "Ověří nainstalované nástroje. Chybějící může po potvrzení stáhnout a spustit z oficiálního zdroje.",
+        "intro": "Ověří volitelné externí nástroje. Chybějící může po potvrzení stáhnout a nainstalovat odděleně z oficiálního zdroje.",
         "found": "Nalezeno: {path}",
         "missing": "Nenalezeno",
         "official": "Otevřít oficiální zdroj…",
         "install": "Stáhnout a instalovat…",
         "installed": "Nainstalováno",
+        "opennec_name": "OpenNEC (řešič NEC-2)",
+        "opennec_missing_help": "Bez OpenNEC zůstane import NEC výsledků dostupný, ale vlastní modely zatím nepůjde vypočítat.",
         "checking_install": "Instalátor spuštěn — čekám na dokončení a průběžně ověřuji…",
-        "resolve_failed": "Instalátor nelze bezpečně určit",
-        "download_confirm_title": "Stáhnout oficiální instalátor?",
+        "resolve_failed": "Balíček nelze bezpečně určit",
+        "download_confirm_title": "Stáhnout oficiální balíček?",
         "download_confirm": "Stáhnout {name} {version} ({size:.1f} MB) z oficiálního GitHub release?\n\nSoubor bude přijat pouze při shodě publikovaného SHA-256.",
         "downloading": "Stahuji {name}…",
         "run_confirm_title": "Spustit ověřený instalátor?",
         "run_confirm": "Soubor byl stažen a jeho SHA-256 souhlasí.\n\nSpustit nyní {filename}? Další kroky řídí instalační program dodavatele.",
+        "portable_confirm_title": "Nainstalovat ověřený externí nástroj?",
+        "portable_confirm": "Balíček {filename} byl stažen a jeho SHA-256 souhlasí.\n\nRozbalit OpenNEC do samostatné uživatelské složky?\n{destination}\n\nOpenNEC zůstane odděleným nástrojem a Antenna Pattern Lab pouze ověří přítomnost jeho programu.",
+        "portable_installed": "OpenNEC byl nainstalován",
+        "portable_installed_detail": "Ověřený externí nástroj byl nainstalován do:\n{path}",
+        "portable_failed": "OpenNEC nelze nainstalovat",
         "download_failed": "Stažení nebo ověření selhalo",
         "launch_failed": "Instalátor nelze spustit",
         "confirm_title": "Otevřít externí web?",
@@ -82,19 +90,26 @@ TEXT = {
     },
     "ENG": {
         "title": "First run and external tools",
-        "intro": "Checks installed tools. Missing tools can be downloaded and launched from their official source after confirmation.",
+        "intro": "Checks optional external tools. Missing tools can be downloaded and installed separately from their official source after confirmation.",
         "found": "Found: {path}",
         "missing": "Not found",
         "official": "Open official source…",
         "install": "Download and install…",
         "installed": "Installed",
+        "opennec_name": "OpenNEC (NEC-2 solver)",
+        "opennec_missing_help": "Without OpenNEC, imported NEC results remain available, but local antenna models cannot be calculated yet.",
         "checking_install": "Installer launched — waiting for completion and checking automatically…",
-        "resolve_failed": "Cannot safely resolve installer",
-        "download_confirm_title": "Download official installer?",
+        "resolve_failed": "Cannot safely resolve package",
+        "download_confirm_title": "Download official package?",
         "download_confirm": "Download {name} {version} ({size:.1f} MB) from the official GitHub release?\n\nThe file is accepted only if its published SHA-256 matches.",
         "downloading": "Downloading {name}…",
         "run_confirm_title": "Launch verified installer?",
         "run_confirm": "The file was downloaded and its SHA-256 matches.\n\nLaunch {filename} now? The vendor installer controls all remaining steps.",
+        "portable_confirm_title": "Install verified external tool?",
+        "portable_confirm": "Package {filename} was downloaded and its SHA-256 matches.\n\nExtract OpenNEC into its separate per-user folder?\n{destination}\n\nOpenNEC remains a separate tool; Antenna Pattern Lab only checks that its executable is present.",
+        "portable_installed": "OpenNEC installed",
+        "portable_installed_detail": "The verified external tool was installed in:\n{path}",
+        "portable_failed": "Cannot install OpenNEC",
         "download_failed": "Download or verification failed",
         "launch_failed": "Cannot launch installer",
         "confirm_title": "Open an external website?",
@@ -154,25 +169,32 @@ class SetupDialog(QDialog):
         self._rigctld_launch_attempts = 0
         self._rigctld_pid: int | None = None
         self.setWindowTitle(self.text["title"])
-        self.resize(760, 410)
+        self.resize(800, 450)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(12)
         intro = QLabel(self.text["intro"])
         intro.setWordWrap(True)
-        intro.setStyleSheet(semantic_style("warning"))
+        intro.setStyleSheet(semantic_style("info"))
         layout.addWidget(intro)
-        for key in ("hamlib", "wsjtx"):
+        display_names = {
+            "hamlib": "Hamlib rigctld",
+            "wsjtx": "WSJT-X",
+            "opennec": self.text["opennec_name"],
+        }
+        for key in ("hamlib", "wsjtx", "opennec"):
             row = QHBoxLayout()
-            name = QLabel("Hamlib rigctld" if key == "hamlib" else "WSJT-X")
-            name.setMinimumWidth(105)
+            name = QLabel(display_names[key])
+            name.setMinimumWidth(155)
             status = QLabel()
             status.setWordWrap(True)
             install_button = QPushButton(self.text["install"])
+            install_button.setMinimumWidth(170)
             install_button.clicked.connect(
                 lambda _checked=False, item=key: self.download_and_install(item)
             )
             official_button = QPushButton(self.text["official"])
+            official_button.setMinimumWidth(165)
             official_button.clicked.connect(
                 lambda _checked=False, item=key: self.open_official_source(item)
             )
@@ -323,8 +345,10 @@ class SetupDialog(QDialog):
                 self.install_buttons[key].setEnabled(False)
             else:
                 label.setText(self.text["missing"])
-                label.setToolTip("")
-                label.setStyleSheet(semantic_style("danger"))
+                label.setToolTip(
+                    self.text["opennec_missing_help"] if key == "opennec" else ""
+                )
+                label.setStyleSheet(semantic_style("inactive"))
                 self.install_buttons[key].setText(self.text["install"])
                 self.install_buttons[key].setEnabled(True)
                 if key == "hamlib":
@@ -525,6 +549,35 @@ class SetupDialog(QDialog):
     def _download_completed(self, filename: str) -> None:
         self._finish_download_ui()
         path = Path(filename)
+        if self._download_key == "opennec":
+            destination = self._opennec_install_directory()
+            answer = QMessageBox.question(
+                self,
+                self.text["portable_confirm_title"],
+                self.text["portable_confirm"].format(
+                    filename=path.name,
+                    destination=destination,
+                ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self._download_key = None
+                return
+            try:
+                executable = install_opennec_archive(path, destination)
+            except Exception as exc:
+                QMessageBox.warning(self, self.text["portable_failed"], str(exc))
+                self._download_key = None
+                return
+            self._download_key = None
+            self.refresh_detection()
+            QMessageBox.information(
+                self,
+                self.text["portable_installed"],
+                self.text["portable_installed_detail"].format(path=executable),
+            )
+            return
         answer = QMessageBox.question(
             self,
             self.text["run_confirm_title"],
@@ -533,6 +586,7 @@ class SetupDialog(QDialog):
             QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
+            self._download_key = None
             return
         try:
             launch_installer(path)
@@ -550,6 +604,14 @@ class SetupDialog(QDialog):
             self.install_buttons[self._download_key].setEnabled(False)
             self._detection_timer.start()
         self._download_key = None
+
+    @staticmethod
+    def _opennec_install_directory() -> Path:
+        local_data = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.GenericDataLocation
+        )
+        root = Path(local_data) if local_data else Path.home() / "AppData" / "Local"
+        return root / "Programs" / "OpenNEC"
 
     def _save_hamlib_settings(self) -> None:
         self.settings.setValue("rig_model_id", self._rig_model_id())

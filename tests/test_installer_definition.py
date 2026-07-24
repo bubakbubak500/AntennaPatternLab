@@ -13,9 +13,9 @@ def test_release_version_is_041_everywhere():
     installer = (
         ROOT / "installer" / "AntennaPatternLab.iss"
     ).read_text(encoding="utf-8")
-    assert metadata["project"]["version"] == "0.41.0"
-    assert '__version__ = "0.41.0"' in package
-    assert '#define MyAppVersion "0.41.0"' in installer
+    assert metadata["project"]["version"] == "0.42.0"
+    assert '__version__ = "0.42.0"' in package
+    assert '#define MyAppVersion "0.42.0"' in installer
 
 
 def test_installer_preserves_user_data_and_can_sign_uninstaller():

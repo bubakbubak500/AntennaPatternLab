@@ -115,6 +115,28 @@ HELP = {
                 """,
             ),
             (
+                "nec_workbench",
+                "Modelování antény NEC2",
+                """
+                <h2>Modelování antény · NEC2 Workbench</h2>
+                <p>V nabídce <b>Nástroje → Modelování antény (NEC2)</b> vytvoříte
+                drátový model ze šablony dipólu, inverted-V, vertikálu, loopu
+                nebo Yagi. Tabulka upravuje vodiče, napájení, RLC zátěže, zem a
+                frekvenční rozsah. 3D náhled a validace se provedou ještě před
+                výpočtem.</p>
+                <p>OpenNEC je volitelný samostatný proces. Normální běh uloží
+                verzi enginu, přesné parametry, UTC, vstupní a výstupní SHA-256,
+                impedanci, SWR, proudy a 2D/3D vyzařování jako neměnný teoretický
+                baseline. Bez solveru lze modely dál editovat, importovat a
+                exportovat a prohlížet uložené výsledky.</p>
+                <p>Asistované varianty výšky a země jsou oddělené od nezávislého
+                baseline. Orientace se vybírá na trénovacích časových blocích a
+                povinně hodnotí na pozdějších nepoužitých datech. Verze 0.42.0
+                podporuje drátovou podmnožinu NEC2; neobsahuje plochy, budovy,
+                skutečný koaxiál, plný terén ani NEC4.</p>
+                """,
+            ),
+            (
                 "propagation",
                 "Podmínky šíření",
                 """
@@ -192,7 +214,10 @@ HELP = {
                 Průvodce externími nástroji nabízí ověřené oficiální
                 instalátory a vždy vyžaduje samostatný souhlas se stažením i
                 spuštěním. U Hamlibu načte názvy podporovaných rádií a umí po
-                stisku tlačítka spustit nakonfigurovaný <code>rigctld</code>.</p>
+                stisku tlačítka spustit nakonfigurovaný <code>rigctld</code>.
+                Volitelný OpenNEC stáhne jako ověřený přenosný balíček do
+                samostatné uživatelské složky; aplikace pouze detekuje
+                <code>onec.exe</code> a nelinkuje jeho knihovnu.</p>
                 <p>Aktualizace jsou opt-in, používají HTTPS manifest a povinný
                 SHA-256. Uživatelská data leží mimo instalační adresář.</p>
                 """,
@@ -236,12 +261,13 @@ HELP = {
             ("graphs", "Charts and filters", "<h2>Charts and filters</h2><p>Time, distance, day/night, band, mode and data source define the chart and table input. Narrow sectors add detail but reduce support.</p><ul><li><b>Directional</b>: median SNR with a finite, gap-preserving outline.</li><li><b>Time balanced</b>: equal weight per 30-minute block.</li><li><b>Detrended</b>: removes slow common drift.</li><li><b>Receiver balanced</b>: one stability-weighted vote per RX and sector.</li><li><b>Stable control</b>: removes a common trend only with enough stable RX in diverse directions.</li><li><b>Count, reach, time, map and exposure</b>: coverage and detection context.</li></ul><p>The ⓘ icon explains the active view. Click a data item to pin its tooltip; the same data is in the accessible table.</p>"),
             ("map", "Spot map", "<h2>Spot map</h2><p>The separate map inherits the main-window filters. Hover over an RX to display the great-circle route, bearing, distance, median SNR, report count and last time. Its world extent is fixed and the navigation toolbar is intentionally omitted.</p>"),
             ("profiles", "Antenna profiles and model", "<h2>Antenna profiles</h2><p>A profile records type, dimensions, orientation, power, tuner and notes. A physical change creates a new revision instead of rewriting history.</p><p>The simplified model is a geometric reference, not absolute gain. External NEC output remains separate from empirical observations.</p>"),
+            ("nec_workbench", "NEC2 antenna modeling", "<h2>Antenna Modeling · NEC2 Workbench</h2><p>Open <b>Tools → Antenna modeling (NEC2)</b> to create a wire model from Dipole, Inverted-V, Vertical, Loop, or Yagi templates. Tables edit wires, the feed point, series RLC loads, ground, and frequency sweep; the 3D preview and validation run before calculation.</p><p>Optional OpenNEC runs only as a standalone process. A normal run stores its engine version, exact parameters, UTC, input/output SHA-256, impedance, SWR, currents, and 2D/3D radiation as an immutable theoretical baseline. Models and saved results remain usable without the solver.</p><p>Assisted height/ground candidates stay separate from the independent baseline. Orientation is selected on training time blocks and must report performance on later unused data. Version 0.42.0 supports the documented NEC2 wire subset—not patches, buildings, real coax, full terrain, or NEC4.</p>"),
             ("propagation", "Propagation conditions", "<h2>Propagation conditions</h2><p><b>Tools → Propagation conditions</b> downloads official NOAA SWPC data only after an explicit button press: Kp, F10.7, sunspot number, solar-wind speed, IMF Bt/Bz and R/S/G scales. D-RAP, auroral-oval and GOES SUVI 195 Å solar images provide visual context.</p><p>Downloaded products remain in a local cache with current, stale, partial and offline states. A snapshot can be saved to a campaign with normalized values, UTC timestamps, the canonical NOAA JSON source rows used, and their SHA-256.</p><p>These indicators are measurement context—not a path forecast or an automatic antenna-gain correction.</p>"),
             ("campaigns", "Measurement campaigns", "<h2>Measurement campaigns</h2><p>A campaign fixes callsign, grid, band, mode, profile, interval and objective. Spots and TX sessions are assigned only when time and configuration match. Set targets for spots, RX, sectors and time blocks.</p><p>The UTC log records setup and environment changes. Attachments are managed SHA-256-verified copies.</p>"),
             ("experiments", "A/B experiments", "<h2>A/B experiments</h2><p>The guided protocol changes profiles only after physical-switch confirmation. Comparison pairs nearby reports from the same RX and gives each receiver equal result weight.</p><p>Keep band, power and distance layer comparable and alternate profiles in time. A bootstrap interval describes sampling uncertainty but does not prove causality.</p>"),
             ("coverage", "Coverage and planning", "<h2>Coverage and planning</h2><p>Coverage combines report, RX, time-block and interval support. The bearing × distance × day/night matrix reveals one-sided samples. The next-window planner uses observed RX availability and missing cells; it is not an ionospheric forecast.</p>"),
             ("hardware", "Hamlib and rotator", "<h2>Rig and rotator</h2><p><code>rigctld</code> supplies read-only frequency, mode and PTT. <code>rotctld</code> supplies actual position. Movement and profile-axis mismatch are warned and stored with TX quality.</p><p>The current safety model sends no command to the rig, rotator or WSJT-X.</p>"),
-            ("settings", "Settings and external tools", "<h2>Settings</h2><p>Communications contains MQTT/WSJT-X/Hamlib/rotator addresses and ports. The external-tool assistant offers verified official installers and requires separate download and launch consent. For Hamlib it loads the supported radio names and can start the configured <code>rigctld</code> when you press the button.</p><p>Updates are opt-in and require an HTTPS manifest plus SHA-256. User data remains outside the install directory.</p>"),
+            ("settings", "Settings and external tools", "<h2>Settings</h2><p>Communications contains MQTT/WSJT-X/Hamlib/rotator addresses and ports. The external-tool assistant offers verified official installers and requires separate download and launch consent. For Hamlib it loads the supported radio names and can start the configured <code>rigctld</code> when you press the button. Optional OpenNEC is downloaded as a verified portable package into a separate per-user folder; the application only detects <code>onec.exe</code> and does not link its library.</p><p>Updates are opt-in and require an HTTPS manifest plus SHA-256. User data remains outside the install directory.</p>"),
             ("data_safety", "Database and diagnostics", "<h2>Data safety</h2><p>A verified SQLite backup is created before schema migration. Corrupt, unverifiable or newer schemas stop the migration. Five backups are retained.</p><p>The local diagnostic JSON is created only after confirmation and contains configuration, connection state and database integrity—not individual spots, messages or passwords.</p>"),
             ("interpretation", "Correct interpretation", "<h2>Correct interpretation</h2><p>The result is an empirical reach profile for a particular station, time, band, mode, power, receiver network and propagation state. It is most useful for repeated controlled comparisons.</p><p>A spot alone does not establish absolute gain, elevation pattern or efficiency. Do not mix bands, modes, major power changes, ADIF QSOs and passive reports without the source filter. Strong conclusions need angular, temporal and receiver diversity.</p>"),
         ],

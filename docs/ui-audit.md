@@ -4,6 +4,18 @@ Audit date: 2026-07-23
 Baseline application version: 0.36.1
 Scope: Phase 1 baseline followed by Phases 2–11 implementation and validation
 
+## Milestone 10×NEC workbench
+
+The first rendered pass of the real workbench exposed three release-blocking
+presentation issues: the results view selected an impedance-only frequency and
+therefore showed empty radiation plots; the geometry preview auto-scaled a
+horizontal wire into an exaggerated Z range while long raw floats compressed
+the editor; and the Czech candidate view retained English column/scope labels
+with a clipped input-hash heading. The second pass selects only frequencies
+that contain radiation data, applies equal physical axis ranges, formats table
+coordinates to six significant digits, reserves two visible wire rows at the
+minimum supported height, and localizes/resizes the candidate table.
+
 ## Evidence and method
 
 The current source was rendered with an isolated temporary SQLite database and
@@ -450,6 +462,31 @@ UDP section. Monitor Light Czech and Monitor Dark English captures are stored as
 dialog capture is stored under `docs/ui/before/`. The dialog was also rendered
 at 200% Qt scaling with no clipping or overlap. Offscreen captures use DejaVu
 Sans because the rendering environment does not expose native Windows fonts.
+
+### OpenNEC external-engine extension
+
+The dialog was extended on 2026-07-24 with the optional OpenNEC NEC-2 solver.
+The production release metadata check resolved official stable version 2.2.0,
+the exact non-OpenBLAS Windows x86-64 ZIP, its published size, and SHA-256.
+The validation did not install a solver into the operator's profile or run an
+antenna calculation.
+
+The first visual pass found and corrected:
+
+1. a missing optional solver used the danger treatment even though absence is
+   an expected supported state;
+2. the longer portable-install label shifted the action columns between rows;
+3. `OpenNEC NEC-2` did not explain that the component is the calculation
+   solver or what remains available without it.
+
+The final row uses neutral non-color status text, aligned action columns, a
+localized solver name, and an explanatory tooltip. The real dialog was
+inspected in Czech Monitor Light, English Monitor Dark, English Classic, and
+the same three states at 200% Qt scaling. No label, action, form field, note, or
+dialog button clips or overlaps. Updated captures are
+`dialog-external-tools-cze-light.png`,
+`dialog-external-tools-eng-dark.png`, and
+`dialog-external-tools-eng-classic.png` under `docs/ui/after/`.
 
 ## 0.39 propagation-conditions validation
 

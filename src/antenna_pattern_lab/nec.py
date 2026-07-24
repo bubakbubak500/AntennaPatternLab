@@ -5,6 +5,9 @@ from pathlib import Path
 import re
 import shutil
 
+from .antenna_model import AntennaModel
+from .nec_runner import NecRunResult, select_azimuth_cut
+
 
 @dataclass(frozen=True, slots=True)
 class NecPoint:
@@ -130,6 +133,80 @@ def parse_nec_baseline(
     )
 
 
+def baseline_from_run(
+    result: NecRunResult,
+    model: AntennaModel,
+    *,
+    frequency_hz: int | None = None,
+) -> NecBaseline:
+    """Convert a reproducible saved solver run into the comparison baseline."""
+    frequencies = tuple(
+        dict.fromkeys(item.frequency_hz for item in result.radiation)
+    )
+    target = frequency_hz
+    if target is None and frequencies:
+        target = frequencies[len(frequencies) // 2]
+    rows = [
+        item
+        for item in result.radiation
+        if target is None or item.frequency_hz == target
+    ]
+    _azimuth_theta, azimuth_samples = select_azimuth_cut(rows)
+    azimuth_rows = [
+        (item.phi_deg % 360.0, item.gain_db)
+        for item in azimuth_samples
+    ]
+    elevation_rows = [
+        (item.theta_deg, item.gain_db)
+        for item in rows
+        if _angular_distance(item.phi_deg, model.orientation_deg) <= 0.2
+    ]
+    if len(elevation_rows) < 2:
+        elevation_rows = [
+            (item.theta_deg, item.gain_db)
+            for item in rows
+            if _angular_distance(item.phi_deg, 0.0) <= 0.2
+        ]
+    if len(azimuth_rows) < 2 or len(elevation_rows) < 2:
+        raise ValueError("Saved OpenNEC result lacks usable azimuth/elevation cuts.")
+    source = (
+        f"saved OpenNEC run · {result.output_sha256[:16]} · "
+        f"{result.engine_version}"
+    )
+    azimuth = _pattern_from_rows(azimuth_rows, source + " · azimuth")
+    elevation = _pattern_from_rows(elevation_rows, source + " · elevation")
+    front = _gain_at(azimuth, model.orientation_deg)
+    back = _gain_at(azimuth, model.orientation_deg + 180)
+    return NecBaseline(
+        azimuth,
+        elevation,
+        NecModelParameters(
+            target,
+            "solver total gain",
+            max(
+                (
+                    max(wire.start.z_m, wire.end.z_m)
+                    for wire in model.wires
+                ),
+                default=None,
+            ),
+            (
+                model.ground.kind
+                if model.ground.kind != "real"
+                else (
+                    f"real εr={model.ground.relative_permittivity:g}, "
+                    f"σ={model.ground.conductivity_s_m:g} S/m"
+                )
+            ),
+            model.orientation_deg,
+            source,
+        ),
+        (
+            front.absolute_gain_db - back.absolute_gain_db
+            if front is not None and back is not None
+            else None
+        ),
+    )
 def _radiation_rows(text: str) -> list[tuple[float, float, float]]:
     in_pattern = False
     rows = []
@@ -169,7 +246,8 @@ def _pattern_from_rows(
 
 def _frequency_from_output(text: str) -> int | None:
     match = re.search(
-        r"FREQUENCY\s*(?:=|:)?\s*([-+]?\d+(?:\.\d+)?)\s*(MHZ|KHZ|HZ)?",
+        r"FREQUENCY\s*(?:=|:)?\s*"
+        r"([-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?)\s*(MHZ|KHZ|HZ)?",
         text,
         re.IGNORECASE,
     )

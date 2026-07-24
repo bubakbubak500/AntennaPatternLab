@@ -134,6 +134,27 @@ def test_propagation_conditions_is_opened_from_tools_menu(tmp_path, monkeypatch)
     application.processEvents()
 
 
+def test_antenna_modeling_is_opened_from_tools_menu(tmp_path, monkeypatch):
+    application, _settings, window = _window(tmp_path)
+    opened = []
+
+    class FakeDialog:
+        def __init__(self, repository, language, parent):
+            opened.append((repository, language, parent))
+
+        def exec(self):
+            opened.append("exec")
+
+    monkeypatch.setattr("antenna_pattern_lab.ui.AntennaModelingDialog", FakeDialog)
+    window.antenna_modeling_action.trigger()
+
+    assert opened[0] == (window.repository, "CZE", window)
+    assert opened[1] == "exec"
+    assert window.antenna_modeling_action in window.tools_menu.actions()
+    window.close()
+    application.processEvents()
+
+
 def test_main_workflow_has_accessible_controls_and_logical_tab_order(tmp_path):
     application, _settings, window = _window(tmp_path)
 

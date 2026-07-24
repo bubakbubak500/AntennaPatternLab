@@ -48,6 +48,7 @@ from .analysis import (
     time_normalized_sector_profile,
     trend_adjusted_sector_profile,
 )
+from .antenna_modeling_dialog import AntennaModelingDialog
 from .appearance_dialog import AppearanceDialog
 from .ab_dialog import AbComparisonDialog
 from .adif_io import import_adif
@@ -162,6 +163,7 @@ TRANSLATIONS = {
         "coverage": "Pokrytí měření…",
         "propagation_conditions": "Podmínky šíření…",
         "propagation_intelligence": "Propagation Intelligence…",
+        "antenna_modeling": "Modelování antény (NEC2)…",
         "exit": "Ukončit",
         "about_text": "Antenna Pattern Lab {version}\n\nNástroj pro modelování a porovnávání směrových vyzařovacích diagramů antén z reálných záznamů radioamatérského provozu.\n\nFT8/WSPR a PSK Reporter slouží jako zdroje měřicích dat; cílem je odhadnout, vizualizovat a porovnávat chování anténních sestav.",
         "callsign": "Moje značka",
@@ -446,6 +448,7 @@ TRANSLATIONS = {
         "coverage": "Measurement coverage…",
         "propagation_conditions": "Propagation conditions…",
         "propagation_intelligence": "Propagation Intelligence…",
+        "antenna_modeling": "Antenna modeling (NEC2)…",
         "exit": "Exit",
         "about_text": "Antenna Pattern Lab {version}\n\nA tool for modelling and comparing directional antenna radiation patterns from real amateur-radio operating records.\n\nFT8/WSPR and PSK Reporter provide measurement data; the goal is to estimate, visualize and compare antenna-system behaviour.",
         "callsign": "My callsign",
@@ -1100,9 +1103,14 @@ class MainWindow(QMainWindow):
         self.propagation_intelligence_action.triggered.connect(
             self._open_propagation_intelligence
         )
+        self.antenna_modeling_action = QAction(self)
+        self.antenna_modeling_action.triggered.connect(
+            self._open_antenna_modeling
+        )
         self.tools_menu.addActions(
             [
                 self.profiles_action,
+                self.antenna_modeling_action,
                 self.ab_action,
                 self.experiment_action,
                 self.campaigns_action,
@@ -2589,6 +2597,7 @@ class MainWindow(QMainWindow):
         self.propagation_intelligence_action.setText(
             self._text("propagation_intelligence")
         )
+        self.antenna_modeling_action.setText(self._text("antenna_modeling"))
         self.communications_action.setText(self._text("communications"))
         self.external_tools_action.setText(self._text("external_tools"))
         self.updates_action.setText(self._text("updates"))
@@ -2726,6 +2735,13 @@ class MainWindow(QMainWindow):
 
     def _open_propagation_intelligence(self) -> None:
         PropagationIntelligenceDialog(
+            self.repository,
+            self.language_code,
+            self,
+        ).exec()
+
+    def _open_antenna_modeling(self) -> None:
+        AntennaModelingDialog(
             self.repository,
             self.language_code,
             self,

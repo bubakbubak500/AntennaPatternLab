@@ -276,6 +276,46 @@ Propagation Intelligence naváže na reprodukovatelná data z milníku 9 a vztá
   oddělené vrstvy, migrace databáze, bloková validace, CZE/ENG dokumentace a
   vizuální matice Monitor Light / Dark / Classic jsou součástí vydání 0.41.0.
 
+## Milník 10×NEC — Antenna Modeling Workbench
+
+Samostatný modelovací pracovní prostor doplní importovaný NEC baseline o
+přívětivou tvorbu a výpočet drátových antén. Výpočetní engine zůstane odděleným
+externím programem; Antenna Pattern Lab bude vlastnit model, uživatelské
+rozhraní, vizualizaci, provenance a porovnání s měřením.
+
+- [x] Přidat OpenNEC jako volitelný externí nástroj: detekce `onec.exe`,
+  oficiální MIT zdroj, samostatné stažení, kontrola publikovaného SHA-256 a
+  instalace do oddělené uživatelské složky. Bez solveru zůstanou měření,
+  analytika a import NEC výstupu funkční.
+- [x] Vytvořit verzovaný interní model drátové geometrie nezávislý na jednom
+  solveru a bezeztrátový import/export podporované podmnožiny `.nec`.
+- [x] Nabídnout průvodce pro dipól, inverted-V, vertikál, loop a Yagi spolu s
+  tabulkovým editorem vodičů, napájecích bodů, zátěží, země a frekvenčního
+  rozsahu.
+- [x] Přidat 3D náhled geometrie a kontrolu segmentace, spojů, poloměru vodičů,
+  zdrojů a omezení NEC-2 ještě před spuštěním výpočtu.
+- [x] Spouštět OpenNEC jako zrušitelný oddělený proces přes dočasný `.nec`
+  vstup a `.out` výstup; zachytit verzi enginu, hash vstupu, parametry a chyby
+  bez načtení nebo linkování jeho knihovny.
+- [x] Zobrazit frekvenční průběh impedance R/X a SWR, proudy na vodičích,
+  azimutový a elevační řez, absolutní/relativní zisk, F/B a otáčivý 3D
+  vyzařovací diagram.
+- [x] Uložit každý výsledek jako reprodukovatelný teoretický baseline a
+  porovnat jej se samostatnými raw coverage a propagation-normalized vrstvami
+  na společné orientaci a referenci.
+- [x] Případné asistované hledání výšky, orientace nebo parametrů půdy oddělit
+  od nezávislého baseline a povinně ověřit na nepoužité části kampaně.
+- [x] První vydání výslovně omezit na podporované drátové modely NEC-2; plošné
+  antény, detailní budovy, skutečný koaxiál a plný terén nejsou součástí tohoto
+  milníku.
+
+### Dokončení milníku 10×NEC — 0.42.0
+
+- [x] Verzovaný model `apl-nec-model/1`, reprodukovatelný výsledek
+  `apl-nec-run/1`, databázové schéma 5, skutečný oddělený OpenNEC 2.2.0,
+  CZE/ENG workbench, pět šablon, 2D/3D výsledky, uložené baseline a holdout
+  validace asistovaných variant jsou součástí vydání 0.42.0.
+
 ## Milník 11 — reporty a přenositelnost
 
 - [ ] Export uceleného HTML/PDF protokolu s grafy, filtry, kvalitou pokrytí a popisem použitých dat.

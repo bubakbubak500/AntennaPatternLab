@@ -13,15 +13,18 @@ from antenna_pattern_lab.dependencies import (
 def test_detects_tools_from_path_without_executing_them(tmp_path):
     rigctld = tmp_path / "rigctld.exe"
     wsjtx = tmp_path / "wsjtx.exe"
+    onec = tmp_path / "onec.exe"
     rigctld.touch()
     wsjtx.touch()
+    onec.touch()
 
     def which(name, path=None):
         return str(tmp_path / name)
 
     statuses = detect_external_tools({"PATH": str(tmp_path)}, which=which)
-    assert [status.found for status in statuses] == [True, True]
+    assert [status.found for status in statuses] == [True, True, True]
     assert statuses[0].executable == rigctld.resolve()
+    assert statuses[2].executable == onec.resolve()
 
 
 def test_detects_common_wsjt_x_location(tmp_path):
@@ -45,6 +48,18 @@ def test_detects_versioned_hamlib_directory(tmp_path):
         which=lambda *_args, **_kwargs: None,
     )
     assert statuses[0].executable == executable.resolve()
+
+
+def test_detects_separately_installed_opennec(tmp_path):
+    executable = tmp_path / "Programs" / "OpenNEC" / "bin" / "onec.exe"
+    executable.parent.mkdir(parents=True)
+    executable.touch()
+    statuses = detect_external_tools(
+        {"LOCALAPPDATA": str(tmp_path), "PATH": ""},
+        which=lambda *_args, **_kwargs: None,
+    )
+    assert statuses[2].key == "opennec"
+    assert statuses[2].executable == executable.resolve()
 
 
 def test_derives_system_drive_for_wsjt_x_when_environment_omits_it(tmp_path):

@@ -39,24 +39,23 @@ def main() -> int:
         prefix="antenna-setup-dialog-",
         ignore_cleanup_errors=True,
     ) as directory:
-        for language, theme in (
-            ("CZE", ThemePreference.LIGHT),
-            ("ENG", ThemePreference.DARK),
+        for language, design_style, theme, suffix in (
+            ("CZE", DesignStyle.MONITOR, ThemePreference.LIGHT, "cze-light"),
+            ("ENG", DesignStyle.MONITOR, ThemePreference.DARK, "eng-dark"),
+            ("ENG", DesignStyle.CLASSIC, ThemePreference.SYSTEM, "eng-classic"),
         ):
             settings = QSettings(
-                str(Path(directory) / f"{language}-{theme.value}.ini"),
+                str(Path(directory) / f"{language}-{design_style.value}-{theme.value}.ini"),
                 QSettings.Format.IniFormat,
             )
-            settings.setValue("ui/design_style", DesignStyle.MONITOR.value)
+            settings.setValue("ui/design_style", design_style.value)
             settings.setValue("ui/theme", theme.value)
             settings.setValue("rig_model_id", 3073)
             controller = ThemeController(settings)
             dialog = SetupDialog(settings, language)
             dialog.show()
             application.processEvents()
-            destination = OUTPUT / (
-                f"dialog-external-tools-{language.lower()}-{theme.value}.png"
-            )
+            destination = OUTPUT / f"dialog-external-tools-{suffix}.png"
             if not dialog.grab().save(str(destination)):
                 raise RuntimeError(f"Could not save {destination}")
             print(destination)

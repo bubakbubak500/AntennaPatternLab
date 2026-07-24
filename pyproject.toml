@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antenna-pattern-lab"
-version = "0.41.0"
+version = "0.42.0"
 description = "Empirical antenna coverage analysis from PSK Reporter FT8 spots"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "matplotlib>=3.8,<4",
+  "numpy>=2,<3",
   "paho-mqtt>=2.1,<3",
   "PySide6>=6.7,<7",
 ]

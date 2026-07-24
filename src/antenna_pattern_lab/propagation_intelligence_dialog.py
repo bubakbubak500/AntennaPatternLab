@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 from statistics import median
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -29,7 +30,8 @@ from PySide6.QtWidgets import (
 )
 
 from .analysis import locate_spot
-from .nec import NecBaseline, NecPattern, parse_nec_baseline
+from .nec import NecBaseline, NecPattern, baseline_from_run, parse_nec_baseline
+from .nec_fitting import FitCandidate, assisted_fit
 from .propagation import PropagationSnapshot
 from .propagation_intelligence import (
     LayerComparison,
@@ -61,6 +63,7 @@ TEXT = {
         "layers": "Tři vrstvy",
         "provenance": "Provenance",
         "import_nec": "Přidat NEC baseline…",
+        "fit_nec": "Asistovaně vybrat variantu",
         "save": "Uložit analytický podklad",
         "empty": "Vyberte kampaň s reporty.",
         "no_snapshot": "Pro tento čas není uložený snapshot podmínek.",
@@ -74,6 +77,8 @@ TEXT = {
         "saved": "Analytický podklad uložen · {hash}",
         "cv": "Bloková validace: {folds} bloků · test MAE {mae}",
         "close": "Zavřít",
+        "saved_baseline": "Uložený baseline",
+        "fit_result": "Holdout validace · orientace {orientation:.0f}° · Δh {height:+g} m · {ground} · train MAE {train:.1f} dB · test MAE {test:.1f} dB · baseline {baseline:.1f} dB",
     },
     "ENG": {
         "title": "Propagation Intelligence",
@@ -91,6 +96,7 @@ TEXT = {
         "layers": "Three layers",
         "provenance": "Provenance",
         "import_nec": "Add NEC baseline…",
+        "fit_nec": "Assisted candidate selection",
         "save": "Save analytical basis",
         "empty": "Select a campaign containing reports.",
         "no_snapshot": "No stored conditions snapshot covers this time.",
@@ -104,6 +110,8 @@ TEXT = {
         "saved": "Analytical basis saved · {hash}",
         "cv": "Blocked validation: {folds} blocks · test MAE {mae}",
         "close": "Close",
+        "saved_baseline": "Saved baseline",
+        "fit_result": "Holdout validation · orientation {orientation:.0f}° · Δh {height:+g} m · {ground} · train MAE {train:.1f} dB · test MAE {test:.1f} dB · baseline {baseline:.1f} dB",
     },
 }
 
@@ -181,6 +189,7 @@ class PropagationIntelligenceDialog(QDialog):
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
         self._load_campaigns()
+        self._load_saved_nec_runs()
 
     def _build_route_tab(self) -> QWidget:
         page = QWidget()
@@ -219,8 +228,11 @@ class PropagationIntelligenceDialog(QDialog):
         self.nec_choice = QComboBox()
         self.nec_choice.addItem("— NEC —", None)
         self.nec_choice.currentIndexChanged.connect(self.refresh)
+        self.fit_nec_button = QPushButton(self.text["fit_nec"])
+        self.fit_nec_button.clicked.connect(self._fit_saved_candidates)
         row.addWidget(self.import_nec_button)
         row.addWidget(self.nec_choice)
+        row.addWidget(self.fit_nec_button)
         row.addStretch(1)
         layout.addLayout(row)
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -773,6 +785,104 @@ class PropagationIntelligenceDialog(QDialog):
             )
         if self.nec_patterns:
             self.nec_choice.setCurrentIndex(self.nec_choice.count() - 1)
+
+    def _load_saved_nec_runs(self) -> None:
+        existing_sources = {
+            baseline.parameters.source for _name, baseline in self.nec_patterns
+        }
+        for stored_run in self.repository.list_nec_runs(
+            purpose="independent_baseline"
+        ):
+            stored_model = self.repository.get_nec_model(stored_run.model_id)
+            try:
+                baseline = baseline_from_run(
+                    stored_run.result,
+                    stored_model.model,
+                    frequency_hz=self._representative_frequency(),
+                )
+            except ValueError:
+                try:
+                    baseline = baseline_from_run(
+                        stored_run.result,
+                        stored_model.model,
+                    )
+                except ValueError:
+                    continue
+            if baseline.parameters.source in existing_sources:
+                continue
+            self.nec_patterns.append(
+                (
+                    f"{self.text['saved_baseline']} #{stored_run.id} · "
+                    f"{stored_model.name} r{stored_model.revision}",
+                    baseline,
+                )
+            )
+            self.nec_choice.addItem(
+                f"{self.text['saved_baseline']} #{stored_run.id} · "
+                f"{stored_model.name} r{stored_model.revision} · "
+                f"{baseline.parameters.frequency_hz / 1e6:.3f} MHz",
+                len(self.nec_patterns) - 1,
+            )
+            existing_sources.add(baseline.parameters.source)
+        self.fit_nec_button.setEnabled(
+            bool(self.repository.list_nec_runs(purpose="assisted_candidate"))
+        )
+
+    def _fit_saved_candidates(self) -> None:
+        if len(self._located) < 2:
+            self.status.setText(self.text["empty"])
+            return
+        candidates = []
+        by_run = {}
+        for stored_run in self.repository.list_nec_runs(
+            purpose="assisted_candidate"
+        ):
+            stored_model = self.repository.get_nec_model(stored_run.model_id)
+            match = re.search(r"Δh\s*([-+]?\d+(?:\.\d+)?)", stored_run.label)
+            height = float(match.group(1)) if match else 0.0
+            candidate = FitCandidate(
+                stored_model.id,
+                stored_run.id,
+                height,
+                stored_model.model.ground.kind,
+                stored_model.model,
+                stored_run.result,
+            )
+            candidates.append(candidate)
+            by_run[stored_run.id] = stored_run
+        try:
+            result = assisted_fit(
+                self._located,
+                self._feature_for_spot,
+                candidates,
+            )
+        except ValueError as exc:
+            self.status.setText(str(exc))
+            return
+        selected = by_run[result.candidate_run_id]
+        self.repository.save_nec_run(
+            selected.model_id,
+            selected.result,
+            campaign_id=int(self.campaign.currentData()),
+            purpose="assisted_candidate",
+            label=selected.label,
+            validation_json=result.canonical_json(),
+        )
+        self.status.setText(
+            self.text["fit_result"].format(
+                orientation=result.orientation_deg,
+                height=result.height_delta_m,
+                ground=result.ground_kind,
+                train=result.train_median_absolute_error_db,
+                test=result.test_median_absolute_error_db,
+                baseline=result.baseline_test_median_absolute_error_db,
+            )
+            + (
+                "<br>" + " · ".join(result.warnings)
+                if result.warnings
+                else ""
+            )
+        )
 
     def _save_features(self) -> None:
         if self.features is None:

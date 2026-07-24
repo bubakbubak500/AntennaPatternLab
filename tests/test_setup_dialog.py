@@ -16,6 +16,13 @@ def test_setup_dialog_saves_ports_and_never_opens_url_without_consent(tmp_path, 
     statuses = (
         DependencyStatus("hamlib", "Hamlib rigctld", False, None, "https://example.test/hamlib"),
         DependencyStatus("wsjtx", "WSJT-X", False, None, "https://example.test/wsjtx"),
+        DependencyStatus(
+            "opennec",
+            "OpenNEC (NEC-2 solver)",
+            False,
+            None,
+            "https://example.test/opennec",
+        ),
     )
     monkeypatch.setattr("antenna_pattern_lab.setup_dialog.detect_external_tools", lambda: statuses)
     opened = []
@@ -24,12 +31,13 @@ def test_setup_dialog_saves_ports_and_never_opens_url_without_consent(tmp_path, 
         QMessageBox, "question", lambda *_args, **_kwargs: QMessageBox.StandardButton.No
     )
     dialog = SetupDialog(settings, "ENG")
-    assert dialog.height() <= 430
+    assert dialog.height() <= 470
     text_color = dialog.palette().color(QPalette.ColorRole.WindowText)
     background = dialog.palette().color(QPalette.ColorRole.Window)
     assert text_color.lightness() < background.lightness()
     assert dialog.install_buttons["hamlib"].isEnabled()
     assert dialog.install_buttons["wsjtx"].text() == "Download and install…"
+    assert dialog.install_buttons["opennec"].isEnabled()
     dialog.open_official_source("wsjtx")
     assert opened == []
     dialog.serial_port.setText("COM7")
@@ -53,10 +61,12 @@ def test_setup_dialog_rechecks_a_launched_installer_until_tool_is_found(
     missing = (
         DependencyStatus("hamlib", "Hamlib rigctld", False, None, "https://example.test"),
         DependencyStatus("wsjtx", "WSJT-X", False, None, "https://example.test"),
+        DependencyStatus("opennec", "OpenNEC", False, None, "https://example.test"),
     )
     found = (
         DependencyStatus("hamlib", "Hamlib rigctld", True, executable, "https://example.test"),
         missing[1],
+        missing[2],
     )
     detections = iter((missing, found))
     monkeypatch.setattr(
@@ -92,6 +102,7 @@ def test_setup_dialog_maps_model_names_and_starts_rigctld(tmp_path, monkeypatch)
     statuses = (
         DependencyStatus("hamlib", "Hamlib rigctld", True, executable, "https://example.test"),
         DependencyStatus("wsjtx", "WSJT-X", False, None, "https://example.test"),
+        DependencyStatus("opennec", "OpenNEC", False, None, "https://example.test"),
     )
     monkeypatch.setattr(
         "antenna_pattern_lab.setup_dialog.detect_external_tools", lambda: statuses
@@ -137,5 +148,56 @@ def test_setup_dialog_maps_model_names_and_starts_rigctld(tmp_path, monkeypatch)
     ]
     assert dialog.rigctld_status.text() == "Running on port 4532 (PID 1234)"
     assert int(settings.value("rig_model_id")) == 3073
+    dialog.close()
+    application.processEvents()
+
+
+def test_setup_dialog_installs_opennec_as_a_separate_verified_tool(
+    tmp_path, monkeypatch
+):
+    application = QApplication.instance() or QApplication([])
+    settings = QSettings(str(tmp_path / "setup.ini"), QSettings.Format.IniFormat)
+    package = tmp_path / "onec-windows-x86_64.zip"
+    package.touch()
+    destination = tmp_path / "Programs" / "OpenNEC"
+    executable = destination / "bin" / "onec.exe"
+    missing = (
+        DependencyStatus("hamlib", "Hamlib", False, None, "https://example.test"),
+        DependencyStatus("wsjtx", "WSJT-X", False, None, "https://example.test"),
+        DependencyStatus("opennec", "OpenNEC", False, None, "https://example.test"),
+    )
+    found = missing[:2] + (
+        DependencyStatus("opennec", "OpenNEC", True, executable, "https://example.test"),
+    )
+    detections = iter((missing, found))
+    monkeypatch.setattr(
+        "antenna_pattern_lab.setup_dialog.detect_external_tools",
+        lambda: next(detections),
+    )
+    monkeypatch.setattr(
+        SetupDialog,
+        "_opennec_install_directory",
+        staticmethod(lambda: destination),
+    )
+    installed = []
+    monkeypatch.setattr(
+        "antenna_pattern_lab.setup_dialog.install_opennec_archive",
+        lambda archive, target: installed.append((archive, target)) or executable,
+    )
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
+    )
+    monkeypatch.setattr(QMessageBox, "information", lambda *_args, **_kwargs: None)
+
+    dialog = SetupDialog(settings, "ENG")
+    dialog._download_key = "opennec"
+    dialog._download_completed(str(package))
+
+    assert installed == [(package, destination)]
+    assert dialog._download_key is None
+    assert dialog.status_labels["opennec"].text() == "Installed"
+    assert dialog.status_labels["opennec"].toolTip() == str(executable)
     dialog.close()
     application.processEvents()
