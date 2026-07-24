@@ -41,6 +41,8 @@ confirmation.
 - polar SNR, distance, count, time-balanced, and coverage views;
 - interactive world map with great-circle paths, azimuth, and distance;
 - campaign comparison, A/B analysis, and coverage planning;
+- NOAA SWPC propagation conditions with offline cache, image products, and
+  campaign snapshots;
 - ADIF/ADI and CSV import, plus CSV export;
 - local SQLite storage and diagnostic export;
 - English and Czech application UI;
@@ -131,8 +133,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change.
 ## Security and privacy
 
 The application stores its data locally. Network access is used only for features
-the user enables, such as PSK Reporter collection, verified external-tool
-downloads, and update checks.
+the user enables, such as PSK Reporter collection, an explicit NOAA SWPC refresh,
+verified external-tool downloads, and update checks.
 
 Please report security problems privately as described in
 [SECURITY.md](SECURITY.md), not in a public issue.

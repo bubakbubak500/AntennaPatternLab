@@ -96,7 +96,29 @@ Large uncovered gaps are intentionally not interpolated as measured data.
 The map shows report locations and great-circle paths from the transmitting
 locator. Azimuth is the initial bearing at the transmitter.
 
-## 8. Import and export
+## 8. Propagation conditions
+
+Open **Tools → Propagation conditions** to add current space-weather context to
+a measurement. The screen does not make any network request when opened. Press
+**Refresh from NOAA** to explicitly download official NOAA SWPC observations
+and images.
+
+The overview includes planetary Kp, F10.7 flux, the latest available observed
+sunspot number, solar-wind speed, IMF Bt/Bz, and NOAA R/S/G scales. Separate
+panels show D-RAP D-region absorption, the northern auroral-oval forecast, and
+GOES SUVI 195 Å solar imagery.
+
+Downloaded products are cached locally. Current, stale, partial, offline, and
+unavailable states remain visible. Select a campaign and use **Save snapshot to
+campaign** to preserve normalized values, UTC timestamps, the canonical NOAA
+JSON source rows used, and their SHA-256. Stored snapshots appear in the
+campaign timeline.
+
+Treat this information as measurement context. It is not a point-to-point
+propagation forecast and does not turn coverage reports into calibrated antenna
+gain.
+
+## 9. Import and export
 
 Use **Data → Import data** for CSV, ADI, or ADIF files. In a completed QSO,
 `RST_RCVD` is interpreted as the report the remote station sent about your signal.
@@ -105,14 +127,14 @@ to the wider passive PSK Reporter dataset.
 
 CSV export can be used for independent analysis or archival.
 
-## 9. Appearance
+## 10. Appearance
 
 Open **Settings → Appearance…** to retain the native **Classic** interface or
 enable the compact **Monitor** design. Monitor provides **Dark**, **Light**, and
 **Follow system** themes. The preference is saved automatically. Follow system
 tracks Windows color-scheme changes while the application remains open.
 
-## 10. Updates
+## 11. Updates
 
 Open **Settings → Updates** to check the official GitHub release channel. Automatic
 checks run in the background on every startup. If the internet or GitHub is
@@ -130,7 +152,7 @@ Current releases are not Authenticode-signed, so Windows may report an unknown
 publisher or show a SmartScreen warning. Download only from the official GitHub
 Releases page and compare the installer with the published SHA-256 checksum.
 
-## 11. Diagnostics and data
+## 12. Diagnostics and data
 
 Application data is stored outside the installation directory and is preserved by
 an in-place upgrade. The diagnostics export helps with support requests but should

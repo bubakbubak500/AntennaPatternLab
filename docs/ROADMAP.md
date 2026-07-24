@@ -15,7 +15,7 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [x] hrubý sektorový profil, tabulka, CSV a demo,
 - [x] automatické testy a PyInstaller build,
 - [x] export diagnostického JSON pro reprodukovatelné ověření celého živého řetězce,
-- [ ] ověřit živý sběr s OK7PS na reálném vysílání,
+- [x] živý test s OK7PS, reálným rádiem a skutečným vysíláním úspěšně ověřil celý sběrný řetězec,
 - [x] HTTP import poslední historie PSK Reporteru (max. 24 hodin, rate limit),
 - [x] instalační balíček a bezpečné opt-in aktualizační jádro,
 - [ ] důvěryhodný Authenticode podpis a zveřejněný release kanál.
@@ -137,13 +137,9 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [x] opt-in automatická kontrola přes validovaný HTTPS manifest a stažení s povinným SHA-256,
 - [ ] zveřejnění manifestu a instalátorů v oficiálním release kanálu.
 
-## Nejbližší ověřovací scénář
+## Ověřený živý scénář
 
-1. Spustit aplikaci s demo daty a ověřit UI/build na cílovém PC.
-2. Smazat pouze demo databázi nebo použít nový profil měření.
-3. Na 20 m vysílat FT8 se stabilním výkonem a jednou anténní konfigurací.
-4. Ověřit příjem živých spotů, lokátory a deduplikaci.
-5. Ověřit WSJT-X UDP při reálném provozu a zkontrolovat správné přiřazení spotů k TX relacím.
+Live test s OK7PS a reálným rádiem dopadl výborně. Na skutečném vysílání byl úspěšně ověřen příjem živých spotů i spolupráce aplikace s rádiovou sestavou. Tento test uzavírá původní MVP ověření živého sběru; podrobné regresní scénáře zůstávají součástí dalších vydání.
 
 ## Otevřená rozhodnutí
 
@@ -180,38 +176,77 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [x] Porovnání zamýšlené mechanické osy profilu, skutečného natočení a podloženého maxima empirických dat včetně kruhových odchylek, počtu podkladů a jistoty.
 - [x] Živé neblokující upozornění na pohyb rotátoru nad 3° během TX a na odchylku mechanické osy od neměnného profilu nad 5°, včetně trvalého označení kvality relace.
 
-## Milník 9 — omezení zkreslení a normalizace
+## Milník 9 — podmínky šíření a kosmické vlivy
 
 - [x] Kalibrace přijímačů podle dlouhodobé stability a omezení váhy velmi aktivních reportérů: jeden hlas RX na sektor, robustní MAD proti souběžnému společnému trendu, omezená váha 0,25–1 a viditelná diagnostika bez metodicky chybného odečtení pevné směrové úrovně.
 - [x] Kontrolní skupina stabilních RX pro rozlišení změny antény od společné změny propagace: nejméně 3 stabilní RX ve 3 různých 60° směrech a 3 společných blocích, centrovaný trend odchylek vůči vlastní úrovni RX a transparentní odmítnutí korekce při nedostatečných datech.
-- [ ] Volitelná metadata sluneční a geomagnetické aktivity uložená reprodukovatelně s kampaní.
+- [x] Nová samostatná obrazovka **Podmínky šíření** s aktuálním stavem, časovou osou kampaně a srozumitelným CZE/ENG vysvětlením významu ukazatelů.
+- [ ] Přehled radioamatérsky významných veličin: sluneční tok F10.7, číslo slunečních skvrn, Kp, geomagnetická bouře, rentgenové erupce, protonový tok, rychlost a hustota slunečního větru a severojižní složka IMF Bz.
+- [x] Obrazové panely NOAA SWPC: GOES SUVI snímek Slunce, D-RAP/absorpce v D-vrstvě a aurorální ovál se zdrojem a stavem dostupnosti.
+- [ ] Pásmový přehled očekávané použitelnosti a MUF/foF2, je-li k dispozici vhodný zdroj nebo výpočet, vždy s odlišením pozorování, předpovědi a odhadu.
+- [ ] Časové překrytí kosmického počasí s kampaní, TX relacemi a změnami výsledného pokrytí, aby šlo odhalit období nevhodná pro přímé A/B srovnání.
+- [x] Volitelná metadata sluneční, ionosférické a geomagnetické aktivity uložená reprodukovatelně s kampaní včetně poskytovatele, UTC času, jednotek, stáří a původní odpovědi s SHA-256.
+- [x] Lokální cache, síťové načtení pouze po výslovné akci a čitelný offline/stale stav; chybějící internetová data neblokují měření ani práci s uloženou kampaní.
 - [ ] Striktní oddělení výsledků podle pásma, módu, výkonu a významné změny RX sítě.
 - [ ] Citlivostní analýza: jak se výsledek změní po vynechání nejsilnějšího RX, času nebo směru.
 
-## Milník 10 — reporty a přenositelnost
+## Milník 10 — tři vrstvy anténního obrazu
+
+Výsledná koncepce musí držet odděleně teorii, skutečně pozorované pokrytí a propagací korigovaný odhad. Uživatel smí vrstvy překrýt a porovnat, ale aplikace je nesmí sloučit do jednoho nejasně pojmenovaného „diagramu antény“.
+
+### 1. NEC baseline
+
+- [ ] Teoretická reference s azimutovým a elevačním diagramem, relativním nebo absolutním gainem a předozadním poměrem.
+- [ ] Varianty výšky antény a několika dokumentovaných modelů půdy; každá křivka ponese parametry modelu, frekvenci, polarizaci a původ NEC výstupu.
+- [ ] Společná úhlová osa, jednotky a explicitní zarovnání orientace pro bezpečné překrytí s empirickými vrstvami.
+
+### 2. Empirický raw diagram
+
+- [ ] Samostatně označený diagram **Coverage / pozorované pokrytí**, nikdy „antenna gain“.
+- [ ] V každém azimutovém sektoru zobrazit počet reportů a unikátních reportérů, nejlepší a mediánové SNR, maximální vzdálenost, hustotu reportů a kvalitu/nejistotu.
+- [ ] Zachovat časové, vzdálenostní, pásmové, módové, výkonové, zdrojové a kampaňové filtry a viditelně uvést jejich aktivní hodnoty.
+- [ ] Nevyplňovat směry bez dat a nepřevádět nerovnoměrnou síť přijímačů na zdánlivě kalibrovaný zisk.
+
+### 3. Propagation-normalized diagram
+
+- [ ] Volitelný očekávaný baseline z VOACAP/REC533 nebo z jednoduššího verzovaného statistického modelu; použitý model a jeho vstupy musí být viditelné a reprodukovatelné.
+- [ ] Pro každý azimut odhadnout relativní empirickou odchylku:
+
+  `EmpiricalGain(az) = median(SNR_observed − SNR_expected)`
+
+- [ ] Po společném referenčním zarovnání porovnat normalizovaný empirický tvar s NEC:
+
+  `Difference(az) = EmpiricalGain(az) − NECGain(az)`
+
+- [ ] Zobrazit křivky NEC, raw coverage, propagation-normalized odhad a jejich rozdíl samostatně i v synchronizovaném porovnání, včetně intervalů nejistoty a sektorů bez dostatečných dat.
+- [ ] Rezidua interpretovat pouze jako **podezření k ověření**, například stínění budovou nebo terénem, neočekávané potlačení směru, common-mode proudy, nesprávnou orientaci antény či nevhodný předpoklad modelu půdy.
+- [ ] Nikdy z rezidua automaticky neurčovat příčinu; nabídnout navazující kontrolovaný A/B experiment nebo kontrolu sestavy.
+- [ ] Křížová validace po časových blocích: normalizační model vytvořit z části kampaně a ověřit na dosud nepoužitých datech.
+
+## Milník 11 — reporty a přenositelnost
 
 - [ ] Export uceleného HTML/PDF protokolu s grafy, filtry, kvalitou pokrytí a popisem použitých dat.
+- [ ] Report zahrne všechny tři vrstvy, použitý propagation baseline, snapshot podmínek šíření a rezidua NEC versus realita, aniž by raw coverage označil jako zisk antény.
 - [ ] Přenosný balíček kampaně obsahující spoty, TX relace, verzi profilu, nastavení analýzy a kontrolní součty.
 - [ ] Import balíčku v režimu pouze pro čtení a porovnání dvou kampaní z různých počítačů.
 - [ ] Záloha a obnova databáze z aplikace včetně kontroly integrity.
 - [ ] Úplná provenance výsledku: verze aplikace, algoritmu, databázového schématu a času vytvoření.
 
-## Milník 11 — provoz a vydávání
+## Milník 12 — provoz a vydávání
 
 - [x] Automatická bezpečná záloha databáze před migrací schématu: kontrola integrity zdroje i kopie, atomické dokončení, uchování pěti posledních záloh a odmítnutí migrace při chybě.
 - [ ] Publikovaný aktualizační manifest, archiv starších verzí a podporovaný návrat na poslední funkční build.
 - [ ] Authenticode podpis aplikace, instalátoru a odinstalátoru.
 - [ ] Anonymní opt-in diagnostický balíček vytvořený lokálně a odesílaný pouze výslovným krokem uživatele.
 
-## Milník 12 — validace modelu a prostředí stanoviště
+## Milník 13 — validace modelu a prostředí stanoviště
 
 - [ ] Reprodukovatelný profil místního horizontu a terénu s ručním importem výškových dat a jasně uvedeným zdrojem.
-- [ ] Porovnání NEC reference a empirického diagramu po pásmech, vzdálenostních vrstvách a denní době včetně mapy reziduí.
-- [ ] Křížová validace po časových blocích: model se vytvoří z části kampaně a ověří na dosud nepoužitých datech.
+- [ ] Validace rozdílu NEC a propagation-normalized diagramu po pásmech, vzdálenostních vrstvách, denní době a podmínkách šíření včetně mapy reziduí.
 - [ ] Odhad stability hlavního směru a šířky laloku mezi kampaněmi, nikoli pouze rozdíl jednoho maxima.
 - [ ] Detekce dlouhodobého driftu sestavy, například změny orientace, napájení nebo kabelu proti referenční kampani.
 
-## Milník 13 — asistované řízení měření
+## Milník 14 — asistované řízení měření
 
 - [ ] Volitelný plán kampaně složený z doporučených měřicích oken, profilů, pásem a cílových směrů.
 - [ ] Bezpečné opt-in řízení rotátoru přes `rotctld` s potvrzením cíle, softwarovými limity a povinným readbackem skutečné polohy.
@@ -219,7 +254,7 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [ ] Neměnný auditní záznam každého požadovaného směru, odpovědi hardware, potvrzení uživatele a případného selhání.
 - [ ] Režim „průvodce měřením“, který vede obsluhu krok za krokem, ale nikdy samostatně nezahájí vysílání.
 
-## Milník 14 — auditovatelná nejistota a falsifikace
+## Milník 15 — auditovatelná nejistota a falsifikace
 
 - [ ] Blokový bootstrap po časových oknech a RX, který zachová korelaci opakovaných reportů místo předpokladu nezávislosti jednotlivých spotů.
 - [ ] Placebo test záměnou profilů nebo časových štítků; aplikace upozorní, pokud podobně silný „efekt“ vzniká i bez skutečné změny antény.
@@ -227,4 +262,4 @@ Vytvořit snadno spustitelnou Windows x86-64 aplikaci, která radioamatérovi po
 - [ ] Hierarchický experimentální model oddělující společný časový trend, stabilní rozdíly RX a směr, použitý pouze při dostatečně překrytém pokrytí.
 - [ ] Neměnný recept analýzy s verzí algoritmu, parametry, vstupním hashem a možností přesně zopakovat publikovaný výsledek.
 
-Pořadí milníků je záměrné: nejdříve se musí zachovat původ a srovnatelnost dat, poté lze spolehlivě plánovat měření, zapojit směrový hardware a teprve nad tím stavět pokročilejší normalizaci, reprodukovatelné reporty a falsifikační testy.
+Pořadí milníků je záměrné: nejdříve se musí zachovat původ a srovnatelnost dat, poté lze spolehlivě plánovat měření a zapojit směrový hardware. Následuje zachycení podmínek šíření, nad ním tři oddělené analytické vrstvy (NEC, raw coverage a propagation-normalized odhad), reprodukovatelné reporty, validace prostředí stanoviště a nakonec asistované řízení a falsifikační testy.

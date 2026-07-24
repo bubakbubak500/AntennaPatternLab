@@ -101,11 +101,35 @@ def test_language_is_menu_driven_and_empty_states_are_deliberate(tmp_path):
     application.processEvents()
     assert window.language_code == "ENG"
     assert window.language_actions["ENG"].isChecked()
+    assert window.propagation_action.text() == "Propagation conditions…"
 
     assert window.chart_stack.currentWidget() is window.chart_empty
     assert window.chart_empty.heading.text() == "The pattern is waiting for data"
     assert window.report_panel.stack.currentWidget() is window.report_panel.empty
     assert window.report_panel.empty.heading.text() == "No reports yet"
+    window.close()
+    application.processEvents()
+
+
+def test_propagation_conditions_is_opened_from_tools_menu(tmp_path, monkeypatch):
+    application, _settings, window = _window(tmp_path)
+    opened = []
+
+    class FakeDialog:
+        def __init__(self, repository, language, parent):
+            opened.append((repository, language, parent))
+
+        def exec(self):
+            opened.append("exec")
+
+    monkeypatch.setattr(
+        "antenna_pattern_lab.ui.PropagationConditionsDialog",
+        FakeDialog,
+    )
+    window.propagation_action.trigger()
+
+    assert opened[0] == (window.repository, "CZE", window)
+    assert opened[1] == "exec"
     window.close()
     application.processEvents()
 

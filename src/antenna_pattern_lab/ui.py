@@ -77,6 +77,7 @@ from .models import calibrate_azimuth_model, representative_frequency_hz, theore
 from .nec import NecPattern, parse_nec_output
 from .profile_dialog import AntennaProfileDialog
 from .profiles import expected_main_bearings
+from .propagation_dialog import PropagationConditionsDialog
 from .rotator_safety import (
     RotatorSafety,
     evaluate_rotator_safety,
@@ -158,6 +159,7 @@ TRANSLATIONS = {
             "sektory {sectors}/{target_sectors} · bloky {blocks}/{target_blocks}"
         ),
         "coverage": "Pokrytí měření…",
+        "propagation_conditions": "Podmínky šíření…",
         "exit": "Ukončit",
         "about_text": "Antenna Pattern Lab {version}\n\nNástroj pro modelování a porovnávání směrových vyzařovacích diagramů antén z reálných záznamů radioamatérského provozu.\n\nFT8/WSPR a PSK Reporter slouží jako zdroje měřicích dat; cílem je odhadnout, vizualizovat a porovnávat chování anténních sestav.",
         "callsign": "Moje značka",
@@ -440,6 +442,7 @@ TRANSLATIONS = {
             "sectors {sectors}/{target_sectors} · blocks {blocks}/{target_blocks}"
         ),
         "coverage": "Measurement coverage…",
+        "propagation_conditions": "Propagation conditions…",
         "exit": "Exit",
         "about_text": "Antenna Pattern Lab {version}\n\nA tool for modelling and comparing directional antenna radiation patterns from real amateur-radio operating records.\n\nFT8/WSPR and PSK Reporter provide measurement data; the goal is to estimate, visualize and compare antenna-system behaviour.",
         "callsign": "My callsign",
@@ -1086,6 +1089,10 @@ class MainWindow(QMainWindow):
         self.campaigns_action.triggered.connect(self._open_campaigns)
         self.coverage_action = QAction(self)
         self.coverage_action.triggered.connect(self._open_coverage)
+        self.propagation_action = QAction(self)
+        self.propagation_action.triggered.connect(
+            self._open_propagation_conditions
+        )
         self.tools_menu.addActions(
             [
                 self.profiles_action,
@@ -1093,6 +1100,7 @@ class MainWindow(QMainWindow):
                 self.experiment_action,
                 self.campaigns_action,
                 self.coverage_action,
+                self.propagation_action,
             ]
         )
 
@@ -2569,6 +2577,7 @@ class MainWindow(QMainWindow):
         self.experiment_action.setText(self._text("experiment"))
         self.campaigns_action.setText(self._text("campaigns"))
         self.coverage_action.setText(self._text("coverage"))
+        self.propagation_action.setText(self._text("propagation_conditions"))
         self.communications_action.setText(self._text("communications"))
         self.external_tools_action.setText(self._text("external_tools"))
         self.updates_action.setText(self._text("updates"))
@@ -2696,6 +2705,13 @@ class MainWindow(QMainWindow):
     def _open_coverage(self) -> None:
         active = self.repository.active_campaign()
         self._show_coverage(active.id if active is not None else None)
+
+    def _open_propagation_conditions(self) -> None:
+        PropagationConditionsDialog(
+            self.repository,
+            self.language_code,
+            self,
+        ).exec()
 
     def _show_coverage(self, campaign_id: int | None) -> None:
         campaign = (

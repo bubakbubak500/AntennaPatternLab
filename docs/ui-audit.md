@@ -450,3 +450,53 @@ UDP section. Monitor Light Czech and Monitor Dark English captures are stored as
 dialog capture is stored under `docs/ui/before/`. The dialog was also rendered
 at 200% Qt scaling with no clipping or overlap. Offscreen captures use DejaVu
 Sans because the rendering environment does not expose native Windows fonts.
+
+## 0.39 propagation-conditions validation
+
+The new real `PropagationConditionsDialog` was rendered on 2026-07-24 with an
+isolated SQLite database and the official NOAA SWPC products cached by the
+production client. No radio, rotator, collector, transmission, or automatic
+network action was started. The capture refresh itself was a separate explicit
+test of the NOAA client.
+
+Final evidence under [`docs/ui/after`](ui/after/) covers:
+
+- `dialog-propagation-cze-light-empty.png`: 900×620 logical pixels, Monitor
+  Light, Czech, empty cache;
+- `dialog-propagation-cze-light-overview.png`: 1180×760, Monitor Light, Czech,
+  populated overview and active campaign;
+- `dialog-propagation-eng-dark-images.png`: 1366×850, Monitor Dark, English,
+  real D-RAP, auroral-oval, and GOES SUVI images;
+- `dialog-propagation-eng-dark-overview-1920x1080.png`: 1920×1080, Monitor
+  Dark, English;
+- `dialog-propagation-eng-classic-timeline.png`: 1180×760, Classic, English,
+  stored campaign snapshot.
+
+The same state matrix was rendered in an isolated process at
+`QT_SCALE_FACTOR=2`. The 900×620 Czech empty state, long campaign name, tab
+labels, primary/disabled actions, metric grid, explanatory copy, source line,
+and Close button remained visible without clipping or overlap.
+
+The first visual pass found and corrected:
+
+1. Classic captures inheriting the preceding dark Monitor palette in the
+   validation tool rather than restoring a clean native baseline;
+2. the recommended-workflow label consuming a stretched blank region instead
+   of remaining a compact explanatory footer;
+3. an unnecessary numbered vertical header in the campaign timeline.
+
+The final review found no obvious P0 or P1 issue. The overview deliberately uses
+available height without inventing additional metrics, image panels preserve
+aspect ratios, source URLs remain visible and selectable, numerical timeline
+columns are right-aligned and sort by numeric values, and state meaning combines
+shape, text, and semantic color. The offscreen font renders Å as A in one panel
+title; the NOAA image itself remains correct and this matches the previously
+documented offscreen font limitation.
+
+Verification:
+
+- production NOAA fetch: Kp, F10.7, SSN, solar-wind speed, Bt/Bz, R/S/G, and
+  all three images loaded successfully;
+- full suite: `165 passed in 13.55s`;
+- 100%, 200%, Monitor Light, Monitor Dark, Classic, Czech, English, empty,
+  populated, and stored-timeline states inspected.

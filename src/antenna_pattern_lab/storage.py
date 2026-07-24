@@ -14,6 +14,7 @@ from .domain import Spot
 from .experiments import TxSessionSummary
 from .exposure import ActivityWindow, ExposureObservation
 from .profiles import AntennaProfile
+from .propagation import PropagationSnapshot
 
 
 class DatabaseMigrationError(RuntimeError):
@@ -22,7 +23,7 @@ class DatabaseMigrationError(RuntimeError):
 
 class SpotRepository:
     MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     BACKUP_RETENTION = 5
 
     def __init__(self, database_path: str | Path):
@@ -147,6 +148,34 @@ class SpotRepository:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS campaign_attachment_campaign_idx "
                 "ON campaign_attachments(campaign_id, added_at DESC)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS propagation_snapshots (
+                    id INTEGER PRIMARY KEY,
+                    campaign_id INTEGER NOT NULL,
+                    fetched_at TEXT NOT NULL,
+                    observed_at TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    kp_index REAL,
+                    f107_sfu REAL,
+                    sunspot_number REAL,
+                    solar_wind_speed_kms REAL,
+                    imf_bt_nt REAL,
+                    imf_bz_nt REAL,
+                    radio_blackout_scale INTEGER,
+                    solar_radiation_scale INTEGER,
+                    geomagnetic_scale INTEGER,
+                    payload_sha256 TEXT NOT NULL,
+                    raw_payload_json TEXT NOT NULL,
+                    stale INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(campaign_id, payload_sha256)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS propagation_snapshot_campaign_idx "
+                "ON propagation_snapshots(campaign_id, observed_at DESC)"
             )
             connection.execute(
                 """
@@ -645,6 +674,80 @@ class SpotRepository:
                 (campaign_id, limit),
             ).fetchall()
         return [_row_to_campaign_log_entry(row) for row in rows]
+
+    def save_propagation_snapshot(
+        self,
+        campaign_id: int,
+        snapshot: PropagationSnapshot,
+    ) -> PropagationSnapshot:
+        snapshot = snapshot.validated()
+        if campaign_id < 1:
+            raise ValueError("Campaign ID is required.")
+        with self._connect() as connection:
+            campaign = connection.execute(
+                "SELECT 1 FROM measurement_campaigns WHERE id = ?",
+                (campaign_id,),
+            ).fetchone()
+            if campaign is None:
+                raise ValueError("Measurement campaign does not exist.")
+            connection.execute(
+                """
+                INSERT INTO propagation_snapshots (
+                    campaign_id, fetched_at, observed_at, provider,
+                    kp_index, f107_sfu, sunspot_number,
+                    solar_wind_speed_kms, imf_bt_nt, imf_bz_nt,
+                    radio_blackout_scale, solar_radiation_scale,
+                    geomagnetic_scale, payload_sha256, raw_payload_json, stale
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(campaign_id, payload_sha256) DO UPDATE SET
+                    fetched_at = excluded.fetched_at,
+                    observed_at = excluded.observed_at,
+                    stale = excluded.stale
+                """,
+                (
+                    campaign_id,
+                    snapshot.fetched_at.isoformat(),
+                    snapshot.observed_at.isoformat(),
+                    snapshot.provider,
+                    snapshot.kp_index,
+                    snapshot.f107_sfu,
+                    snapshot.sunspot_number,
+                    snapshot.solar_wind_speed_kms,
+                    snapshot.imf_bt_nt,
+                    snapshot.imf_bz_nt,
+                    snapshot.radio_blackout_scale,
+                    snapshot.solar_radiation_scale,
+                    snapshot.geomagnetic_scale,
+                    snapshot.payload_sha256,
+                    snapshot.raw_payload_json,
+                    int(snapshot.stale),
+                ),
+            )
+            row = connection.execute(
+                """
+                SELECT * FROM propagation_snapshots
+                WHERE campaign_id = ? AND payload_sha256 = ?
+                """,
+                (campaign_id, snapshot.payload_sha256),
+            ).fetchone()
+        return _row_to_propagation_snapshot(row)
+
+    def list_propagation_snapshots(
+        self,
+        campaign_id: int,
+        limit: int = 1000,
+    ) -> list[PropagationSnapshot]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM propagation_snapshots
+                WHERE campaign_id = ?
+                ORDER BY observed_at DESC, id DESC
+                LIMIT ?
+                """,
+                (campaign_id, limit),
+            ).fetchall()
+        return [_row_to_propagation_snapshot(row) for row in rows]
 
     def import_campaign_attachment(
         self,
@@ -1294,6 +1397,28 @@ def _row_to_campaign_log_entry(row: sqlite3.Row) -> CampaignLogEntry:
         recorded_at=datetime.fromisoformat(row["recorded_at"]),
         category=row["category"],
         text=row["text"],
+    )
+
+
+def _row_to_propagation_snapshot(row: sqlite3.Row) -> PropagationSnapshot:
+    return PropagationSnapshot(
+        id=row["id"],
+        campaign_id=row["campaign_id"],
+        fetched_at=datetime.fromisoformat(row["fetched_at"]),
+        observed_at=datetime.fromisoformat(row["observed_at"]),
+        provider=row["provider"],
+        kp_index=row["kp_index"],
+        f107_sfu=row["f107_sfu"],
+        sunspot_number=row["sunspot_number"],
+        solar_wind_speed_kms=row["solar_wind_speed_kms"],
+        imf_bt_nt=row["imf_bt_nt"],
+        imf_bz_nt=row["imf_bz_nt"],
+        radio_blackout_scale=row["radio_blackout_scale"],
+        solar_radiation_scale=row["solar_radiation_scale"],
+        geomagnetic_scale=row["geomagnetic_scale"],
+        payload_sha256=row["payload_sha256"],
+        raw_payload_json=row["raw_payload_json"],
+        stale=bool(row["stale"]),
     )
 
 

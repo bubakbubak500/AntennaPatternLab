@@ -5,7 +5,7 @@ import tomllib
 ROOT = Path(__file__).parents[1]
 
 
-def test_release_version_is_038_everywhere():
+def test_release_version_is_039_everywhere():
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package = (
         ROOT / "src" / "antenna_pattern_lab" / "__init__.py"
@@ -13,9 +13,9 @@ def test_release_version_is_038_everywhere():
     installer = (
         ROOT / "installer" / "AntennaPatternLab.iss"
     ).read_text(encoding="utf-8")
-    assert metadata["project"]["version"] == "0.38.0"
-    assert '__version__ = "0.38.0"' in package
-    assert '#define MyAppVersion "0.38.0"' in installer
+    assert metadata["project"]["version"] == "0.39.0"
+    assert '__version__ = "0.39.0"' in package
+    assert '#define MyAppVersion "0.39.0"' in installer
 
 
 def test_installer_preserves_user_data_and_can_sign_uninstaller():

@@ -115,6 +115,24 @@ HELP = {
                 """,
             ),
             (
+                "propagation",
+                "Podmínky šíření",
+                """
+                <h2>Podmínky šíření</h2>
+                <p>Obrazovka <b>Nástroje → Podmínky šíření</b> načítá po
+                výslovném stisku tlačítka oficiální data NOAA SWPC: Kp, F10.7,
+                číslo slunečních skvrn, rychlost slunečního větru, IMF Bt/Bz a
+                stupnice R/S/G. Doplňují je snímky D-RAP, aurorálního oválu a
+                Slunce v pásmu GOES SUVI 195 Å.</p>
+                <p>Stažená data zůstávají v lokální cache. Aplikace rozlišuje
+                aktuální, zastaralý, částečný a offline stav. Snapshot lze uložit
+                k vybrané kampani; obsahuje normalizované hodnoty, UTC časy,
+                použité původní řádky NOAA JSON a jejich SHA-256.</p>
+                <p>Tyto údaje jsou kontext měření, nikoli předpověď konkrétní
+                trasy ani automatická korekce zisku antény.</p>
+                """,
+            ),
+            (
                 "campaigns",
                 "Měřicí kampaně",
                 """
@@ -218,6 +236,7 @@ HELP = {
             ("graphs", "Charts and filters", "<h2>Charts and filters</h2><p>Time, distance, day/night, band, mode and data source define the chart and table input. Narrow sectors add detail but reduce support.</p><ul><li><b>Directional</b>: median SNR with a finite, gap-preserving outline.</li><li><b>Time balanced</b>: equal weight per 30-minute block.</li><li><b>Detrended</b>: removes slow common drift.</li><li><b>Receiver balanced</b>: one stability-weighted vote per RX and sector.</li><li><b>Stable control</b>: removes a common trend only with enough stable RX in diverse directions.</li><li><b>Count, reach, time, map and exposure</b>: coverage and detection context.</li></ul><p>The ⓘ icon explains the active view. Click a data item to pin its tooltip; the same data is in the accessible table.</p>"),
             ("map", "Spot map", "<h2>Spot map</h2><p>The separate map inherits the main-window filters. Hover over an RX to display the great-circle route, bearing, distance, median SNR, report count and last time. Its world extent is fixed and the navigation toolbar is intentionally omitted.</p>"),
             ("profiles", "Antenna profiles and model", "<h2>Antenna profiles</h2><p>A profile records type, dimensions, orientation, power, tuner and notes. A physical change creates a new revision instead of rewriting history.</p><p>The simplified model is a geometric reference, not absolute gain. External NEC output remains separate from empirical observations.</p>"),
+            ("propagation", "Propagation conditions", "<h2>Propagation conditions</h2><p><b>Tools → Propagation conditions</b> downloads official NOAA SWPC data only after an explicit button press: Kp, F10.7, sunspot number, solar-wind speed, IMF Bt/Bz and R/S/G scales. D-RAP, auroral-oval and GOES SUVI 195 Å solar images provide visual context.</p><p>Downloaded products remain in a local cache with current, stale, partial and offline states. A snapshot can be saved to a campaign with normalized values, UTC timestamps, the canonical NOAA JSON source rows used, and their SHA-256.</p><p>These indicators are measurement context—not a path forecast or an automatic antenna-gain correction.</p>"),
             ("campaigns", "Measurement campaigns", "<h2>Measurement campaigns</h2><p>A campaign fixes callsign, grid, band, mode, profile, interval and objective. Spots and TX sessions are assigned only when time and configuration match. Set targets for spots, RX, sectors and time blocks.</p><p>The UTC log records setup and environment changes. Attachments are managed SHA-256-verified copies.</p>"),
             ("experiments", "A/B experiments", "<h2>A/B experiments</h2><p>The guided protocol changes profiles only after physical-switch confirmation. Comparison pairs nearby reports from the same RX and gives each receiver equal result weight.</p><p>Keep band, power and distance layer comparable and alternate profiles in time. A bootstrap interval describes sampling uncertainty but does not prove causality.</p>"),
             ("coverage", "Coverage and planning", "<h2>Coverage and planning</h2><p>Coverage combines report, RX, time-block and interval support. The bearing × distance × day/night matrix reveals one-sided samples. The next-window planner uses observed RX availability and missing cells; it is not an ionospheric forecast.</p>"),
