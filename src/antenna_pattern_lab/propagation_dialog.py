@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import datetime, timezone
 
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
+from matplotlib.figure import Figure
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QDesktopServices, QPixmap
+from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -14,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -24,16 +29,28 @@ from PySide6.QtWidgets import (
 )
 
 from .design_system import DataPanel, MetricItem, PanelHeader, StatusIndicator
+from .ionosphere import (
+    GIRO_LICENSE,
+    GIRO_LICENSE_URL,
+    GiroDidbaseClient,
+    IonosphereBundle,
+    band_usability,
+)
+from .geo import distance_and_bearing, maidenhead_to_latlon
 from .propagation import (
     IMAGE_SOURCES,
     NoaaSwpcClient,
     PropagationBundle,
     PropagationDataError,
+    SeriesPoint,
+    attach_ionosphere,
     condition_summary,
     freshness_text,
+    ionosphere_from_snapshot,
+    operational_context,
 )
 from .storage import SpotRepository
-from .theme import semantic_style
+from .theme import TOKENS, apply_figure_theme, semantic_style
 from .ui_formatting import TechnicalTableItem
 
 
@@ -55,6 +72,10 @@ TEXT = {
         "overview": "Přehled",
         "images": "Obrazové produkty",
         "timeline": "Časová osa kampaně",
+        "trends": "Trendy 24 h",
+        "planning": "Upozornění a prognóza",
+        "ionosphere": "Ionosféra",
+        "analysis": "Srovnatelnost kampaně",
         "measurements": "Pozorované ukazatele",
         "interpretation": "Orientační význam pro KV",
         "workflow_title": "Doporučený postup",
@@ -107,10 +128,15 @@ TEXT = {
             "drap": "D‑RAP · absorpce v D-vrstvě",
             "aurora": "Aurorální ovál · 30min předpověď",
             "sun": "Slunce · GOES SUVI 195 Å",
+            "glotec": "GloTEC · globální TEC (model)",
         },
         "image_empty": "Obrázek není v cache.",
         "image_source": "NOAA SWPC · {url}",
+        "drap_frequency": "Modelová frekvence D‑RAP:",
+        "drap_history": "Otevřít historii/animaci D‑RAP",
+        "image_metadata": "Model / předpověď · NOAA SWPC · snímek stažen {time} UTC",
         "timeline_empty": "Pro vybranou kampaň nejsou uložené snapshoty.",
+        "load_snapshot": "Načíst vybraný historický snapshot",
         "timeline_headers": [
             "Pozorováno UTC",
             "Kp",
@@ -124,6 +150,51 @@ TEXT = {
         "current": "aktuální",
         "stale": "zastaralé",
         "close": "Zavřít",
+        "flare": "Erupce: nyní {current}, maximum {peak} · {begin} / {maximum} / {end}",
+        "proton": "Protony ≥10 MeV · NOAA S{scale}; S1 začíná na 10 pfu. Zvýšení může způsobit polární absorpci.",
+        "trend_empty": "Časové řady nejsou v cache.",
+        "alerts_headers": ["Vydáno UTC", "Typ", "Bulletin"],
+        "forecast_headers": ["Den UTC", "Kp max", "Ap", "F10.7", "M %", "X %", "Proton %"],
+        "cme": "Předpověď / model · {source} · očekávaný průchod u Země {arrival} · rychlost {speed} · zásah {impact}",
+        "observation": "Pozorování",
+        "forecast": "Předpověď",
+        "model": "Model",
+        "giro_note": (
+            "GIRO/DIDBase · {license}. Automatická měření mohou obsahovat chyby; "
+            "CS 999 označuje ruční validaci. TEC ani MUF nejsou mírou zisku antény "
+            "a nesmějí samy korigovat SNR."
+        ),
+        "ionosphere_headers": [
+            "Stanice", "Pozorováno UTC", "CS", "foF2 MHz", "MUF(3000) MHz",
+            "hmF2 km", "Škálování", "Vzdálenost",
+        ],
+        "open_ionogram": "Otevřít ionogram",
+        "target_grid": "Cílový lokátor:",
+        "target_grid_tip": "Volitelný Maidenhead lokátor cílové oblasti pro výběr další blízké ionosondy.",
+        "band_headers": ["Pásmo", "Orientační stav"],
+        "band_states": {
+            "supported": "pod MUF s rezervou",
+            "marginal": "blízko MUF",
+            "above_muf": "nad pozorovanou MUF",
+            "unknown": "bez podkladu",
+        },
+        "analysis_headers": ["UTC blok", "Reporty", "RX", "TX", "Medián SNR", "Δ SNR", "Podmínky", "Přímé A/B"],
+        "sensitivity_headers": ["Vynecháno", "Hodnota", "Zbývá", "Max změna sektoru"],
+        "yes": "ano",
+        "no": "ne",
+        "analysis_terms": {
+            "receiver_network_changed": "změna sítě RX",
+            "conditions_not_comparable": "podmínky nejsou srovnatelné",
+            "mixed_band_mode_or_power": "smíšené pásmo, mód nebo výkon",
+            "missing_conditions": "chybí podmínky",
+            "stale_conditions": "zastaralé podmínky",
+            "geomagnetic_disturbance": "geomagnetická porucha",
+            "radio_blackout": "rádiový výpadek",
+            "polar_cap_absorption_risk": "riziko polární absorpce",
+            "receiver": "přijímač",
+            "time": "čas",
+            "direction": "směr",
+        },
     },
     "ENG": {
         "title": "Propagation conditions",
@@ -142,6 +213,10 @@ TEXT = {
         "overview": "Overview",
         "images": "Image products",
         "timeline": "Campaign timeline",
+        "trends": "24 h trends",
+        "planning": "Alerts and forecast",
+        "ionosphere": "Ionosphere",
+        "analysis": "Campaign comparability",
         "measurements": "Observed indicators",
         "interpretation": "Indicative HF meaning",
         "workflow_title": "Recommended workflow",
@@ -194,10 +269,15 @@ TEXT = {
             "drap": "D‑RAP · D-region absorption",
             "aurora": "Auroral oval · 30-minute forecast",
             "sun": "Sun · GOES SUVI 195 Å",
+            "glotec": "GloTEC · global TEC (model)",
         },
         "image_empty": "The image is not cached.",
         "image_source": "NOAA SWPC · {url}",
+        "drap_frequency": "D‑RAP model frequency:",
+        "drap_history": "Open D‑RAP history/animation",
+        "image_metadata": "Model / forecast · NOAA SWPC · image fetched {time} UTC",
         "timeline_empty": "No snapshots are stored for the selected campaign.",
+        "load_snapshot": "Load selected historical snapshot",
         "timeline_headers": [
             "Observed UTC",
             "Kp",
@@ -211,6 +291,51 @@ TEXT = {
         "current": "current",
         "stale": "stale",
         "close": "Close",
+        "flare": "Flare: current {current}, peak {peak} · {begin} / {maximum} / {end}",
+        "proton": "Protons ≥10 MeV · NOAA S{scale}; S1 starts at 10 pfu. Elevated flux can cause polar-cap absorption.",
+        "trend_empty": "No time series are cached.",
+        "alerts_headers": ["Issued UTC", "Type", "Bulletin"],
+        "forecast_headers": ["Day UTC", "Kp max", "Ap", "F10.7", "M %", "X %", "Proton %"],
+        "cme": "Forecast / model · {source} · expected passage at Earth {arrival} · speed {speed} · impact {impact}",
+        "observation": "Observation",
+        "forecast": "Forecast",
+        "model": "Model",
+        "giro_note": (
+            "GIRO/DIDBase · {license}. Autoscaled measurements can contain errors; "
+            "CS 999 marks manual validation. TEC and MUF are not antenna-gain "
+            "measures and must not by themselves correct SNR."
+        ),
+        "ionosphere_headers": [
+            "Station", "Observed UTC", "CS", "foF2 MHz", "MUF(3000) MHz",
+            "hmF2 km", "Scaling", "Distance",
+        ],
+        "open_ionogram": "Open ionogram",
+        "target_grid": "Target locator:",
+        "target_grid_tip": "Optional target-area Maidenhead locator used to select another nearby ionosonde.",
+        "band_headers": ["Band", "Indicative state"],
+        "band_states": {
+            "supported": "below MUF with margin",
+            "marginal": "near MUF",
+            "above_muf": "above observed MUF",
+            "unknown": "no evidence",
+        },
+        "analysis_headers": ["UTC block", "Reports", "RX", "TX", "Median SNR", "Δ SNR", "Conditions", "Direct A/B"],
+        "sensitivity_headers": ["Omitted", "Value", "Remaining", "Max sector change"],
+        "yes": "yes",
+        "no": "no",
+        "analysis_terms": {
+            "receiver_network_changed": "receiver network changed",
+            "conditions_not_comparable": "conditions not comparable",
+            "mixed_band_mode_or_power": "mixed band, mode or power",
+            "missing_conditions": "conditions missing",
+            "stale_conditions": "conditions stale",
+            "geomagnetic_disturbance": "geomagnetic disturbance",
+            "radio_blackout": "radio blackout",
+            "polar_cap_absorption_risk": "polar-cap absorption risk",
+            "receiver": "receiver",
+            "time": "time",
+            "direction": "direction",
+        },
     },
 }
 
@@ -222,13 +347,46 @@ class PropagationFetchThread(QThread):
     result_ready = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, client: NoaaSwpcClient):
+    def __init__(
+        self,
+        client: NoaaSwpcClient,
+        giro_client: GiroDidbaseClient | None = None,
+        tx_grid: str = "",
+        target_grid: str = "",
+    ):
         super().__init__()
         self.client = client
+        self.giro_client = giro_client
+        self.tx_grid = tx_grid
+        self.target_grid = target_grid
 
     def run(self) -> None:
         try:
-            self.result_ready.emit(self.client.fetch_current())
+            bundle = self.client.fetch_current()
+            if self.giro_client is not None and self.tx_grid:
+                try:
+                    ionosphere = self.giro_client.fetch_for_grids(
+                        self.tx_grid,
+                        self.target_grid,
+                        station_limit=2,
+                    )
+                    bundle = attach_ionosphere(bundle, ionosphere)
+                    if ionosphere.errors:
+                        bundle = PropagationBundle(
+                            bundle.snapshot,
+                            bundle.images,
+                            bundle.stale_keys,
+                            bundle.errors + ionosphere.errors,
+                            ionosphere,
+                        )
+                except Exception as exc:
+                    bundle = PropagationBundle(
+                        bundle.snapshot,
+                        bundle.images,
+                        bundle.stale_keys,
+                        bundle.errors + (f"GIRO: {exc}",),
+                    )
+            self.result_ready.emit(bundle)
         except PropagationDataError as exc:
             self.failed.emit(str(exc))
         except Exception as exc:  # Defensive boundary around a network worker.
@@ -297,6 +455,7 @@ class PropagationConditionsDialog(QDialog):
         parent=None,
         *,
         client: NoaaSwpcClient | None = None,
+        giro_client: GiroDidbaseClient | None = None,
     ):
         super().__init__(parent)
         self.repository = repository
@@ -307,6 +466,9 @@ class PropagationConditionsDialog(QDialog):
             / f"{repository.path.stem}-propagation-cache"
         )
         self.client = client or NoaaSwpcClient(cache_path)
+        self.giro_client = giro_client or GiroDidbaseClient(
+            cache_path=cache_path / "giro"
+        )
         self.bundle: PropagationBundle | None = None
         self._worker: PropagationFetchThread | None = None
 
@@ -355,8 +517,12 @@ class PropagationConditionsDialog(QDialog):
         self.tabs = QTabWidget()
         self.tabs.setAccessibleName(self.text["title"])
         self.tabs.addTab(self._build_overview_tab(), self.text["overview"])
+        self.tabs.addTab(self._build_trends_tab(), self.text["trends"])
+        self.tabs.addTab(self._build_planning_tab(), self.text["planning"])
+        self.tabs.addTab(self._build_ionosphere_tab(), self.text["ionosphere"])
         self.tabs.addTab(self._build_images_tab(), self.text["images"])
         self.tabs.addTab(self._build_timeline_tab(), self.text["timeline"])
+        self.tabs.addTab(self._build_analysis_tab(), self.text["analysis"])
         outer.addWidget(self.tabs, 1)
 
         source_note = QLabel(self.text["source_note"])
@@ -439,6 +605,29 @@ class PropagationConditionsDialog(QDialog):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
+        controls = QHBoxLayout()
+        controls.setContentsMargins(12, 12, 12, 0)
+        drap_label = QLabel(self.text["drap_frequency"])
+        self.drap_frequency = QComboBox()
+        drap_label.setBuddy(self.drap_frequency)
+        for frequency in (5, 10, 15, 20, 25, 30):
+            self.drap_frequency.addItem(
+                f"{frequency} MHz",
+                f"drap_{frequency:02d}",
+            )
+        self.drap_frequency.setCurrentIndex(1)
+        self.drap_frequency.currentIndexChanged.connect(self._drap_changed)
+        history = QPushButton(self.text["drap_history"])
+        history.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl("https://www.swpc.noaa.gov/products/d-region-absorption-predictions-d-rap")
+            )
+        )
+        controls.addWidget(drap_label)
+        controls.addWidget(self.drap_frequency)
+        controls.addWidget(history)
+        controls.addStretch(1)
+        layout.addLayout(controls)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
@@ -458,7 +647,163 @@ class PropagationConditionsDialog(QDialog):
             grid.setColumnStretch(column, 1)
         scroll.setWidget(content)
         layout.addWidget(scroll)
+        self.image_metadata = QLabel()
+        self.image_metadata.setContentsMargins(12, 0, 12, 8)
+        self.image_metadata.setStyleSheet(semantic_style("text_secondary"))
+        layout.addWidget(self.image_metadata)
         return page
+
+    def _build_trends_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        self.trend_summary = QLabel(self.text["trend_empty"])
+        self.trend_summary.setWordWrap(True)
+        self.trend_summary.setStyleSheet(semantic_style("text_secondary"))
+        layout.addWidget(self.trend_summary)
+        self.trend_figure = Figure(
+            figsize=(10, 6),
+            facecolor=TOKENS.panel_background,
+        )
+        self.trend_canvas = FigureCanvasQTAgg(self.trend_figure)
+        self.trend_canvas.setAccessibleName(self.text["trends"])
+        layout.addWidget(self.trend_canvas, 1)
+        return page
+
+    def _build_planning_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        self.cme_summary = QLabel()
+        self.cme_summary.setWordWrap(True)
+        self.cme_summary.setStyleSheet(semantic_style("text_secondary"))
+        layout.addWidget(self.cme_summary)
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        self.alerts_table = self._technical_table(
+            3, self.text["alerts_headers"], self.text["planning"]
+        )
+        self.alerts_table.cellDoubleClicked.connect(self._open_alert)
+        self.forecast_table = self._technical_table(
+            7, self.text["forecast_headers"], self.text["forecast"]
+        )
+        splitter.addWidget(self.alerts_table)
+        splitter.addWidget(self.forecast_table)
+        splitter.setSizes([260, 300])
+        splitter.setChildrenCollapsible(False)
+        layout.addWidget(splitter, 1)
+        return page
+
+    def _build_ionosphere_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        note = QLabel(
+            self.text["giro_note"].format(license=GIRO_LICENSE)
+            + f"  {GIRO_LICENSE_URL}"
+        )
+        note.setWordWrap(True)
+        note.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
+        note.setStyleSheet(semantic_style("text_secondary"))
+        layout.addWidget(note)
+        target_row = QHBoxLayout()
+        target_label = QLabel(self.text["target_grid"])
+        self.target_grid = QLineEdit()
+        self.target_grid.setMaximumWidth(140)
+        self.target_grid.setPlaceholderText("JN79")
+        self.target_grid.setToolTip(self.text["target_grid_tip"])
+        self.target_grid.setAccessibleDescription(self.text["target_grid_tip"])
+        target_label.setBuddy(self.target_grid)
+        target_row.addWidget(target_label)
+        target_row.addWidget(self.target_grid)
+        target_row.addStretch(1)
+        layout.addLayout(target_row)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.ionosphere_table = self._technical_table(
+            8,
+            self.text["ionosphere_headers"],
+            self.text["ionosphere"],
+        )
+        self.band_table = self._technical_table(
+            2,
+            self.text["band_headers"],
+            self.text["band_headers"][0],
+        )
+        splitter.addWidget(self.ionosphere_table)
+        splitter.addWidget(self.band_table)
+        splitter.setSizes([900, 220])
+        splitter.setChildrenCollapsible(False)
+        layout.addWidget(splitter, 1)
+        actions = QHBoxLayout()
+        self.ionogram_button = QPushButton(self.text["open_ionogram"])
+        self.ionogram_button.setEnabled(False)
+        self.ionogram_button.clicked.connect(self._open_ionogram)
+        actions.addWidget(self.ionogram_button)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+        self.glotec_panel = ImageProductPanel(
+            self.text["image_titles"]["glotec"],
+            self.text["image_source"].format(url=IMAGE_SOURCES["glotec"]),
+            self.text["image_empty"],
+        )
+        self.glotec_panel.setMaximumHeight(280)
+        layout.addWidget(self.glotec_panel, 1)
+        self.ionosphere_table.itemSelectionChanged.connect(
+            self._ionosphere_selection_changed
+        )
+        return page
+
+    def _build_analysis_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        self.analysis_warning = QLabel()
+        self.analysis_warning.setWordWrap(True)
+        self.analysis_warning.setStyleSheet(semantic_style("text_secondary"))
+        layout.addWidget(self.analysis_warning)
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        self.analysis_table = self._technical_table(
+            8,
+            self.text["analysis_headers"],
+            self.text["analysis"],
+        )
+        self.sensitivity_table = self._technical_table(
+            4,
+            self.text["sensitivity_headers"],
+            self.text["sensitivity_headers"][0],
+        )
+        splitter.addWidget(self.analysis_table)
+        splitter.addWidget(self.sensitivity_table)
+        splitter.setSizes([330, 180])
+        splitter.setChildrenCollapsible(False)
+        layout.addWidget(splitter, 1)
+        return page
+
+    @staticmethod
+    def _technical_table(
+        columns: int,
+        headers: list[str],
+        accessible_name: str,
+    ) -> QTableWidget:
+        table = QTableWidget(0, columns)
+        table.setHorizontalHeaderLabels(headers)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        table.setSortingEnabled(True)
+        table.setAccessibleName(accessible_name)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        table.horizontalHeader().setStretchLastSection(True)
+        return table
 
     def _build_timeline_tab(self) -> QWidget:
         page = QWidget()
@@ -482,6 +827,15 @@ class PropagationConditionsDialog(QDialog):
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.setStretchLastSection(True)
         layout.addWidget(self.timeline_table, 1)
+        self.load_snapshot_button = QPushButton(self.text["load_snapshot"])
+        self.load_snapshot_button.setEnabled(False)
+        self.load_snapshot_button.clicked.connect(self._load_selected_snapshot)
+        self.timeline_table.itemSelectionChanged.connect(
+            lambda: self.load_snapshot_button.setEnabled(
+                bool(self.timeline_table.selectedItems())
+            )
+        )
+        layout.addWidget(self.load_snapshot_button)
         self.timeline_message = QLabel()
         self.timeline_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timeline_message.setStyleSheet(semantic_style("text_muted"))
@@ -517,6 +871,9 @@ class PropagationConditionsDialog(QDialog):
             self.bundle is not None and self.campaign.currentData() is not None
         )
         self.refresh_timeline()
+        self.refresh_analysis()
+        if self.bundle is not None:
+            self._fill_ionosphere(self.bundle.ionosphere)
 
     def refresh_from_noaa(self) -> None:
         if self._worker is not None and self._worker.isRunning():
@@ -524,7 +881,18 @@ class PropagationConditionsDialog(QDialog):
         self.refresh_button.setEnabled(False)
         self.save_button.setEnabled(False)
         self._set_status("connecting", self.text["waiting"])
-        worker = PropagationFetchThread(self.client)
+        campaign_id = self.campaign.currentData()
+        tx_grid = (
+            self.repository.get_campaign(int(campaign_id)).tx_grid
+            if campaign_id is not None
+            else ""
+        )
+        worker = PropagationFetchThread(
+            self.client,
+            self.giro_client,
+            tx_grid,
+            self.target_grid.text().strip().upper(),
+        )
         self._worker = worker
         _ACTIVE_THREADS.add(worker)
         worker.result_ready.connect(self._network_result)
@@ -591,6 +959,16 @@ class PropagationConditionsDialog(QDialog):
         self.meaning.style().polish(self.meaning)
         for key, panel in self.image_panels.items():
             panel.set_content(bundle.images.get(key), self.text["image_empty"])
+        self.glotec_panel.set_content(
+            bundle.images.get("glotec"),
+            self.text["image_empty"],
+        )
+        self._drap_changed()
+        self.image_metadata.setText(
+            self.text["image_metadata"].format(time=_utc(snapshot.fetched_at))
+        )
+        self._render_operational_context()
+        self._fill_ionosphere(bundle.ionosphere)
         self._campaign_changed()
 
     def _show_empty_values(self) -> None:
@@ -603,6 +981,404 @@ class PropagationConditionsDialog(QDialog):
         self.meaning.setText(self.text["no_cache"])
         for panel in self.image_panels.values():
             panel.set_content(None, self.text["image_empty"])
+        self.glotec_panel.set_content(None, self.text["image_empty"])
+        self.image_metadata.setText("")
+        self._render_operational_context()
+        self._fill_ionosphere(None)
+
+    def _render_operational_context(self) -> None:
+        self.trend_figure.clear()
+        if self.bundle is None:
+            self.trend_summary.setText(self.text["trend_empty"])
+            self.trend_canvas.draw_idle()
+            self._fill_alerts_and_forecast(None)
+            return
+        context = operational_context(self.bundle.snapshot)
+        flare = context.flare
+        flare_text = (
+            self.text["flare"].format(
+                current=flare.current_class,
+                peak=flare.peak_class,
+                begin=_utc_optional(flare.begin_at),
+                maximum=_utc_optional(flare.peak_at),
+                end=_utc_optional(flare.end_at),
+            )
+            if flare
+            else self.text["trend_empty"]
+        )
+        self.trend_summary.setText(
+            f"{self.text['observation']} · NOAA SWPC · "
+            f"{_utc(self.bundle.snapshot.fetched_at)}\n{flare_text}\n"
+            + self.text["proton"].format(scale=context.proton_scale)
+        )
+        axes = self.trend_figure.subplots(3, 2)
+        plots = (
+            (
+                axes[0][0],
+                context.xray_flux,
+                "GOES X-ray 0.1–0.8 nm",
+                "W/m²",
+                True,
+            ),
+            (
+                axes[0][1],
+                context.proton_flux_10mev,
+                "GOES protons ≥10 MeV",
+                "pfu",
+                True,
+            ),
+            (
+                axes[1][0],
+                tuple(
+                    SeriesPoint(item.observed_at, item.speed_kms)
+                    for item in context.solar_wind
+                    if item.speed_kms is not None
+                ),
+                "Solar wind speed",
+                "km/s",
+                False,
+            ),
+            (
+                axes[1][1],
+                tuple(
+                    SeriesPoint(item.observed_at, item.density_cm3)
+                    for item in context.solar_wind
+                    if item.density_cm3 is not None
+                ),
+                "Solar-wind density / pressure",
+                "cm⁻³ / nPa",
+                False,
+            ),
+            (
+                axes[2][0],
+                tuple(
+                    SeriesPoint(item.observed_at, item.bt_nt)
+                    for item in context.solar_wind
+                    if item.bt_nt is not None
+                ),
+                "IMF Bt / Bz",
+                "nT",
+                False,
+            ),
+            (
+                axes[2][1],
+                context.dst,
+                "Kyoto Dst",
+                "nT",
+                False,
+            ),
+        )
+        for axis, points, title, unit, logarithmic in plots:
+            axis.set_title(title)
+            if points:
+                axis.plot(
+                    [point.observed_at for point in points],
+                    [point.value for point in points],
+                    color=TOKENS.chart_empirical_line,
+                    linewidth=1.2,
+                )
+            else:
+                axis.text(
+                    0.5,
+                    0.5,
+                    "—",
+                    transform=axis.transAxes,
+                    ha="center",
+                    va="center",
+                )
+            if logarithmic:
+                axis.set_yscale("log")
+            axis.set_ylabel(unit)
+            locator = AutoDateLocator(minticks=3, maxticks=6)
+            axis.xaxis.set_major_locator(locator)
+            axis.xaxis.set_major_formatter(ConciseDateFormatter(locator))
+            axis.grid(True, alpha=0.35)
+        wind_times = [item.observed_at for item in context.solar_wind]
+        pressure = [
+            item.dynamic_pressure_npa
+            for item in context.solar_wind
+        ]
+        if wind_times and any(value is not None for value in pressure):
+            axes[1][1].plot(
+                wind_times,
+                [float("nan") if value is None else value for value in pressure],
+                color=TOKENS.chart_series[2],
+                linewidth=1.0,
+                linestyle="--",
+                label="pressure nPa",
+            )
+            axes[1][1].legend(loc="best", fontsize="small")
+        bz_times = [
+            item.observed_at for item in context.solar_wind if item.bz_nt is not None
+        ]
+        bz_values = [
+            item.bz_nt for item in context.solar_wind if item.bz_nt is not None
+        ]
+        if bz_times:
+            axes[2][0].plot(
+                bz_times,
+                bz_values,
+                color=TOKENS.chart_series[3],
+                linewidth=1.0,
+                label="Bz",
+            )
+            axes[2][0].axhline(0, color=TOKENS.chart_grid, linewidth=0.8)
+            axes[2][0].legend(loc="best", fontsize="small")
+        apply_figure_theme(self.trend_figure)
+        self.trend_figure.tight_layout(pad=1.2)
+        self.trend_canvas.draw_idle()
+        self._fill_alerts_and_forecast(context)
+
+    def _fill_alerts_and_forecast(self, context) -> None:
+        cme = context.cme if context else None
+        self.cme_summary.setText(
+            self.text["cme"].format(
+                source=cme.source,
+                arrival=_utc_optional(cme.arrival_at),
+                speed=(
+                    "—"
+                    if cme.speed_kms is None
+                    else f"{cme.speed_kms:.0f} km/s"
+                ),
+                impact=(
+                    "—"
+                    if cme.earth_directed is None
+                    else self.text["yes"]
+                    if cme.earth_directed
+                    else self.text["no"]
+                ),
+            )
+            if cme
+            else ""
+        )
+        alerts = context.alerts if context else ()
+        self.alerts_table.setSortingEnabled(False)
+        self.alerts_table.setRowCount(len(alerts))
+        for row, alert in enumerate(alerts):
+            values = (_utc(alert.issued_at), alert.category, alert.headline)
+            for column, value in enumerate(values):
+                item = TechnicalTableItem(value)
+                item.setToolTip(
+                    f"{alert.message}\n\n{alert.bulletin_url}"
+                    if column == 2
+                    else value
+                )
+                item.setData(Qt.ItemDataRole.UserRole, alert.bulletin_url)
+                self.alerts_table.setItem(row, column, item)
+        self.alerts_table.setSortingEnabled(True)
+
+        forecast = context.forecast if context else ()
+        self.forecast_table.setSortingEnabled(False)
+        self.forecast_table.setRowCount(len(forecast))
+        for row, item in enumerate(forecast):
+            values = (
+                item.day.strftime("%Y-%m-%d"),
+                _value(item.kp_max, 1),
+                _value(item.ap, 0),
+                _value(item.f107_sfu, 0),
+                _optional_percent(item.m_flare_percent),
+                _optional_percent(item.x_flare_percent),
+                _optional_percent(item.proton_percent),
+            )
+            for column, value in enumerate(values):
+                self.forecast_table.setItem(
+                    row,
+                    column,
+                    TechnicalTableItem(
+                        value,
+                        numeric=column > 0,
+                        sort_value=(
+                            (
+                                item.day.timestamp(),
+                                item.kp_max,
+                                item.ap,
+                                item.f107_sfu,
+                                item.m_flare_percent,
+                                item.x_flare_percent,
+                                item.proton_percent,
+                            )[column]
+                            or float("-inf")
+                        ),
+                    ),
+                )
+        self.forecast_table.setSortingEnabled(True)
+        self.forecast_table.sortItems(
+            0,
+            Qt.SortOrder.AscendingOrder,
+        )
+
+    def _fill_ionosphere(
+        self,
+        bundle: IonosphereBundle | None,
+    ) -> None:
+        series = bundle.series if bundle else ()
+        campaign_id = self.campaign.currentData()
+        origin = None
+        if campaign_id is not None:
+            try:
+                origin = maidenhead_to_latlon(
+                    self.repository.get_campaign(int(campaign_id)).tx_grid
+                )
+            except ValueError:
+                pass
+        self.ionosphere_table.setSortingEnabled(False)
+        self.ionosphere_table.setRowCount(len(series))
+        self._ionogram_urls: list[str] = []
+        latest_measurement = None
+        for row, item in enumerate(series):
+            latest = item.latest
+            if latest is None:
+                continue
+            latest_measurement = latest_measurement or latest
+            distance = (
+                distance_and_bearing(
+                    origin,
+                    (item.station.latitude, item.station.longitude),
+                )[0]
+                if origin is not None
+                else None
+            )
+            scaling = (
+                "manual"
+                if latest.manually_validated
+                else "auto"
+            )
+            values = (
+                f"{item.station.code} · {item.station.name}",
+                _utc(latest.observed_at),
+                "—" if latest.confidence_score is None else str(latest.confidence_score),
+                _value(latest.fof2_mhz, 2),
+                _value(latest.muf3000_mhz, 2),
+                _value(latest.hmf2_km, 0),
+                scaling,
+                "—" if distance is None else f"{distance:.0f} km",
+            )
+            self._ionogram_urls.append(item.station.ionogram_url)
+            for column, value in enumerate(values):
+                table_item = TechnicalTableItem(
+                    value,
+                    numeric=column in (2, 3, 4, 5, 7),
+                )
+                table_item.setData(
+                    Qt.ItemDataRole.UserRole,
+                    item.station.ionogram_url,
+                )
+                self.ionosphere_table.setItem(row, column, table_item)
+        self.ionosphere_table.setSortingEnabled(True)
+        states = band_usability(latest_measurement)
+        self.band_table.setSortingEnabled(False)
+        self.band_table.setRowCount(len(states))
+        for row, (band, state) in enumerate(states):
+            self.band_table.setItem(row, 0, TechnicalTableItem(band))
+            self.band_table.setItem(
+                row,
+                1,
+                TechnicalTableItem(self.text["band_states"][state]),
+            )
+        self.band_table.setSortingEnabled(True)
+        self._ionosphere_selection_changed()
+
+    def _ionosphere_selection_changed(self) -> None:
+        self.ionogram_button.setEnabled(
+            bool(self.ionosphere_table.selectedItems())
+        )
+
+    def _open_ionogram(self) -> None:
+        items = self.ionosphere_table.selectedItems()
+        if not items:
+            return
+        url = items[0].data(Qt.ItemDataRole.UserRole)
+        if url:
+            QDesktopServices.openUrl(QUrl(str(url)))
+
+    def _open_alert(self, row: int, _column: int) -> None:
+        item = self.alerts_table.item(row, 0)
+        if item is None:
+            return
+        url = item.data(Qt.ItemDataRole.UserRole)
+        if url:
+            QDesktopServices.openUrl(QUrl(str(url)))
+
+    def _drap_changed(self) -> None:
+        if not hasattr(self, "image_panels"):
+            return
+        key = self.drap_frequency.currentData()
+        content = (
+            self.bundle.images.get(str(key))
+            if self.bundle is not None
+            else None
+        )
+        panel = self.image_panels["drap"]
+        panel.setTitle(
+            f"{self.text['image_titles']['drap']} · "
+            f"{self.drap_frequency.currentText()}"
+        )
+        panel.source.setText(
+            self.text["image_source"].format(url=IMAGE_SOURCES[str(key)])
+        )
+        panel.source.setToolTip(IMAGE_SOURCES[str(key)])
+        panel.set_content(content, self.text["image_empty"])
+
+    def refresh_analysis(self) -> None:
+        campaign_id = self.campaign.currentData()
+        analysis = (
+            self.repository.analyze_campaign_propagation(int(campaign_id))
+            if campaign_id is not None
+            else None
+        )
+        intervals = analysis.intervals if analysis else ()
+        self.analysis_table.setSortingEnabled(False)
+        self.analysis_table.setRowCount(len(intervals))
+        for row, interval in enumerate(intervals):
+            values = (
+                _utc(interval.started_at),
+                str(interval.record_count),
+                str(interval.receiver_count),
+                str(interval.tx_session_count),
+                _signed_value(interval.median_snr_db, 1),
+                _signed_value(interval.median_change_db, 1),
+                ", ".join(
+                    self.text["analysis_terms"].get(flag, flag)
+                    for flag in interval.flags
+                ) or "OK",
+                self.text["yes"] if interval.direct_comparison_suitable else self.text["no"],
+            )
+            for column, value in enumerate(values):
+                self.analysis_table.setItem(
+                    row,
+                    column,
+                    TechnicalTableItem(value, numeric=column in (1, 2, 3, 4, 5)),
+                )
+        self.analysis_table.setSortingEnabled(True)
+        sensitivity = analysis.sensitivity if analysis else ()
+        self.sensitivity_table.setSortingEnabled(False)
+        self.sensitivity_table.setRowCount(len(sensitivity))
+        for row, case in enumerate(sensitivity):
+            values = (
+                self.text["analysis_terms"].get(case.omitted, case.omitted),
+                case.omitted_value,
+                str(case.remaining_count),
+                (
+                    "—"
+                    if case.max_sector_median_change_db is None
+                    else f"{case.max_sector_median_change_db:.1f} dB"
+                ),
+            )
+            for column, value in enumerate(values):
+                self.sensitivity_table.setItem(
+                    row,
+                    column,
+                    TechnicalTableItem(value, numeric=column in (2, 3)),
+                )
+        self.sensitivity_table.setSortingEnabled(True)
+        self.analysis_warning.setText(
+            ", ".join(
+                self.text["analysis_terms"].get(warning, warning)
+                for warning in analysis.warnings
+            )
+            if analysis and analysis.warnings
+            else self.text["timeline_empty"] if campaign_id is not None else ""
+        )
 
     def save_snapshot(self) -> None:
         if self.bundle is None:
@@ -640,6 +1416,9 @@ class PropagationConditionsDialog(QDialog):
             else []
         )
         self.timeline_table.setSortingEnabled(False)
+        self._timeline_snapshots = {
+            snapshot.id: snapshot for snapshot in snapshots
+        }
         self.timeline_table.setRowCount(len(snapshots))
         for row, snapshot in enumerate(snapshots):
             values = (
@@ -676,15 +1455,40 @@ class PropagationConditionsDialog(QDialog):
                     ),
                     numeric=column in (1, 2, 3, 4, 5),
                 )
+                item.setData(Qt.ItemDataRole.UserRole, snapshot.id)
                 self.timeline_table.setItem(row, column, item)
         self.timeline_table.setSortingEnabled(True)
         self.timeline_message.setText(
             self.text["timeline_empty"] if not snapshots else ""
         )
 
+    def _load_selected_snapshot(self) -> None:
+        items = self.timeline_table.selectedItems()
+        if not items:
+            return
+        snapshot = self._timeline_snapshots.get(
+            items[0].data(Qt.ItemDataRole.UserRole)
+        )
+        if snapshot is None:
+            return
+        self._show_bundle(
+            PropagationBundle(
+                snapshot,
+                {},
+                (),
+                (),
+                ionosphere_from_snapshot(snapshot),
+            ),
+            from_network=False,
+        )
+
 
 def _utc(value) -> str:
     return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+
+def _utc_optional(value) -> str:
+    return "—" if value is None else _utc(value)
 
 
 def _value(value: float | None, decimals: int) -> str:
@@ -707,3 +1511,7 @@ def _signed_unit(value: float | None, unit: str, decimals: int) -> str:
 
 def _scale(value: int | None) -> str:
     return "—" if value is None else str(value)
+
+
+def _optional_percent(value: int | None) -> str:
+    return "—" if value is None else f"{value} %"

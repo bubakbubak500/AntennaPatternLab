@@ -41,8 +41,10 @@ confirmation.
 - polar SNR, distance, count, time-balanced, and coverage views;
 - interactive world map with great-circle paths, azimuth, and distance;
 - campaign comparison, A/B analysis, and coverage planning;
-- NOAA SWPC propagation conditions with offline cache, image products, and
-  campaign snapshots;
+- NOAA SWPC X-ray/proton, solar-wind, alert, forecast, D-RAP, GloTEC, and
+  WSA–ENLIL context with offline campaign snapshots;
+- nearby GIRO/DIDBase ionosonde measurements and campaign condition/sensitivity
+  analysis;
 - ADIF/ADI and CSV import, plus CSV export;
 - local SQLite storage and diagnostic export;
 - English and Czech application UI;

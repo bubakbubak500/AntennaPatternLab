@@ -113,11 +113,15 @@ class _Response:
 
 def test_client_fetches_to_cache_then_survives_network_failure(tmp_path):
     resources = {
+        url: _Response(b"[]", "application/json")
+        for url in DATA_SOURCES.values()
+    }
+    resources.update({
         DATA_SOURCES[key]: _Response(
             json.dumps(value).encode("utf-8"), "application/json"
         )
         for key, value in _payloads().items()
-    }
+    })
     resources.update(
         {
             url: _Response(b"image-bytes", "image/png")

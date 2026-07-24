@@ -62,5 +62,7 @@ def test_dialog_loads_cache_translates_and_saves_campaign_snapshot(tmp_path):
     assert len(repository.list_propagation_snapshots(campaign.id)) == 1
     assert "saved" in dialog.status.text()
     assert dialog.timeline_table.rowCount() == 1
+    assert dialog.tabs.count() == 7
+    assert dialog.trend_canvas.accessibleName() == "24 h trends"
     dialog.close()
     application.processEvents()

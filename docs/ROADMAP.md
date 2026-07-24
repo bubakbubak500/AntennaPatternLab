@@ -191,34 +191,34 @@ Live test s OK7PS a reálným rádiem dopadl výborně. Na skutečném vysílán
 
 Tato část rozšíří hotovou obrazovku **Podmínky šíření**. Jejím cílem je popsat a archivovat aktuální stav prostředí; ještě nebude vydávat tvrzení o zisku antény ani automaticky korigovat empirický diagram.
 
-- [ ] Doplnit časové řady GOES X-ray flux za 6/24 hodin, aktuální třídu erupce a začátek, maximum a konec poslední erupce; vysvětlit vazbu na D-vrstvu a HF blackout na osvětlené straně Země.
-- [ ] Doplnit GOES proton flux, zejména kanál `>10 MeV`, práh NOAA S1–S5 a srozumitelné upozornění na riziko polar-cap absorption.
-- [ ] Rozšířit D-RAP o volbu radioamatérského pásma/frekvence, čas animace a historii; vždy uvést modelovou frekvenci, UTC čas snímku a stáří dat.
-- [ ] Doplnit trendy hustoty, rychlosti a dynamického tlaku slunečního větru, Bt/Bz a index Dst; okamžitou hodnotu nezobrazovat bez krátkého časového vývoje.
-- [ ] Přidat časovou osu aktivních NOAA upozornění s rozlišením radio blackout, solar radiation storm a geomagnetic storm a s odkazem na původní bulletin.
-- [ ] Přidat plánovací panel s třídenní prognózou Kp/Ap, F10.7 a pravděpodobností M/X erupce nebo protonové události; 27denní a 45denní výhled nabídnout jako sekundární plánovací pohled.
-- [ ] Doplnit CME kontext z NOAA WSA–ENLIL nebo NASA DONKI: čas události, rychlost, pravděpodobný zásah Země a očekávaný čas příchodu; výsledek označit jako předpověď, nikoli pozorování.
-- [ ] Obrazové panely rozšířit pouze o praktické pohledy: GOES X-ray/proton graf, D-RAP pro zvolené pásmo a volitelnou WSA–ENLIL nebo koronografickou animaci; zabránit vzniku galerie obrázků bez provozního významu.
-- [ ] Každou hodnotu a obraz označit jednotným štítkem **Pozorování / Předpověď / Model**, poskytovatelem, UTC časem, stářím a stavem čerstvé/stale/offline.
+- [x] Doplnit časové řady GOES X-ray flux za 6/24 hodin, aktuální třídu erupce a začátek, maximum a konec poslední erupce; vysvětlit vazbu na D-vrstvu a HF blackout na osvětlené straně Země.
+- [x] Doplnit GOES proton flux, zejména kanál `>10 MeV`, práh NOAA S1–S5 a srozumitelné upozornění na riziko polar-cap absorption.
+- [x] Rozšířit D-RAP o volbu radioamatérského pásma/frekvence, čas animace a historii; vždy uvést modelovou frekvenci, UTC čas snímku a stáří dat.
+- [x] Doplnit trendy hustoty, rychlosti a dynamického tlaku slunečního větru, Bt/Bz a index Dst; okamžitou hodnotu nezobrazovat bez krátkého časového vývoje.
+- [x] Přidat časovou osu aktivních NOAA upozornění s rozlišením radio blackout, solar radiation storm a geomagnetic storm a s odkazem na původní bulletin.
+- [x] Přidat plánovací panel s třídenní prognózou Kp/Ap, F10.7 a pravděpodobností M/X erupce nebo protonové události; 27denní a 45denní výhled nabídnout jako sekundární plánovací pohled.
+- [x] Doplnit CME kontext z NOAA WSA–ENLIL nebo NASA DONKI: čas události, rychlost, pravděpodobný zásah Země a očekávaný čas příchodu; výsledek označit jako předpověď, nikoli pozorování.
+- [x] Obrazové panely rozšířit pouze o praktické pohledy: GOES X-ray/proton graf, D-RAP pro zvolené pásmo a volitelnou WSA–ENLIL nebo koronografickou animaci; zabránit vzniku galerie obrázků bez provozního významu.
+- [x] Každou hodnotu a obraz označit jednotným štítkem **Pozorování / Předpověď / Model**, poskytovatelem, UTC časem, stářím a stavem čerstvé/stale/offline.
 
 ### Navazující část B — skutečný stav ionosféry
 
 Tato část vytvoří měřený a modelový ionosférický podklad, který později využije Propagation Intelligence.
 
-- [ ] Integrovat vhodný a dlouhodobě dostupný zdroj GIRO/DIDBase pro `foF2`, `hmF2`, `MUF(3000)F2`, stav stanice a čas posledního měření.
-- [ ] Zobrazit nejbližší použitelné ionosondy k vysílači a cílové oblasti a umožnit otevření ionogramu; automaticky odvozené hodnoty zřetelně odlišit od ručně validovaných.
-- [ ] Přidat GloTEC/WAM-IPE mapu TEC, odchylky TEC nebo MUF pouze tam, kde je k dispozici stabilní oficiální produkt a jasná licence/původ dat.
-- [ ] Vysvětlit, že TEC není přímá míra kvality HF spojení ani anténního zisku a nesmí být samo o sobě použito jako korekce SNR.
-- [ ] Pásmový přehled očekávané použitelnosti sestavit z dostupného `foF2`/MUF a modelu, vždy s oddělením pozorování, předpovědi a odhadu a bez falešně přesného verdiktu.
-- [ ] Všechny ionosférické hodnoty ukládat do stejného reprodukovatelného snapshotu kampaně jako ostatní podmínky šíření.
+- [x] Integrovat vhodný a dlouhodobě dostupný zdroj GIRO/DIDBase pro `foF2`, `hmF2`, `MUF(3000)F2`, stav stanice a čas posledního měření.
+- [x] Zobrazit nejbližší použitelné ionosondy k vysílači a cílové oblasti a umožnit otevření ionogramu; automaticky odvozené hodnoty zřetelně odlišit od ručně validovaných.
+- [x] Přidat GloTEC/WAM-IPE mapu TEC, odchylky TEC nebo MUF pouze tam, kde je k dispozici stabilní oficiální produkt a jasná licence/původ dat.
+- [x] Vysvětlit, že TEC není přímá míra kvality HF spojení ani anténního zisku a nesmí být samo o sobě použito jako korekce SNR.
+- [x] Pásmový přehled očekávané použitelnosti sestavit z dostupného `foF2`/MUF a modelu, vždy s oddělením pozorování, předpovědi a odhadu a bez falešně přesného verdiktu.
+- [x] Všechny ionosférické hodnoty ukládat do stejného reprodukovatelného snapshotu kampaně jako ostatní podmínky šíření.
 
-### Dokončení milníku 9
+### Dokončení milníku 9 — 0.40.0
 
-- [ ] Časově překrýt kosmické počasí a stav ionosféry s kampaní, TX relacemi a změnami výsledného pokrytí, aby šlo označit období nevhodná pro přímé A/B srovnání.
-- [ ] Striktní oddělení výsledků podle pásma, módu, výkonu a významné změny RX sítě.
-- [ ] Citlivostní analýza: jak se výsledek změní po vynechání nejsilnějšího RX, času nebo směru.
-- [ ] Offline režim, cache a historická kampaň musí zůstat plně použitelné bez aktuálního připojení k NOAA, NASA nebo GIRO.
-- [ ] Charakterizační testy ověří parsery, časové zóny, jednotky, stale data, chybějící položky, změnu poskytujícího satelitu a nedostupnost každého externího zdroje.
+- [x] Časově překrýt kosmické počasí a stav ionosféry s kampaní, TX relacemi a změnami výsledného pokrytí, aby šlo označit období nevhodná pro přímé A/B srovnání.
+- [x] Striktní oddělení výsledků podle pásma, módu, výkonu a významné změny RX sítě.
+- [x] Citlivostní analýza: jak se výsledek změní po vynechání nejsilnějšího RX, času nebo směru.
+- [x] Offline režim, cache a historická kampaň musí zůstat plně použitelné bez aktuálního připojení k NOAA, NASA nebo GIRO.
+- [x] Charakterizační testy ověří parsery, časové zóny, jednotky, stale data, chybějící položky, změnu poskytujícího satelitu a nedostupnost každého externího zdroje.
 
 ## Milník 10 — Propagation Intelligence a tři vrstvy anténního obrazu
 
@@ -236,6 +236,10 @@ Propagation Intelligence naváže na reprodukovatelná data z milníku 9 a vztá
 - [ ] Vytvořit verzovaný soubor příznaků pro pozdější normalizaci: pásmo, místní sluneční čas na trase, den/noc/grayline, vzdálenost, D-RAP absorpce, `foF2`/MUF, Kp/Dst, X-ray/protonový stav a dostupnost zdrojů.
 - [ ] Propagační příznaky nesmějí zpětně měnit raw data; budou uloženy jako odvoditelný, verzovaný analytický podklad se vstupním hashem.
 - [ ] Při chybějících nebo starých datech Propagation Intelligence výslovně sníží jistotu nebo odmítne závěr namísto tichého dosazení běžné hodnoty.
+- [ ] Přenést do každého odvozeného příznaku kvalitu GIRO škálování (`CS`, automatické versus ruční), stáří jednotlivého zdroje a identitu poskytujícího GOES/RTSW satelitu; nejistoty zdrojů se nesmějí sloučit do jediného skóre.
+- [ ] Verzi katalogu ionosond, licenční omezení GIRO a povinné poděkování konkrétnímu provozovateli stanice zahrnout do provenance analytického výsledku i budoucího reportu.
+- [ ] Vyhodnocení trasy proti D‑RAP a GloTEC provádět prostorově nad příslušnou mapou a jejím quality podkladem; globální maximum ani nejbližší pixel nesmí být použity jako náhrada celé trasy.
+- [ ] Při synchronizaci kampaně zachovat samostatné hodiny NOAA, GIRO, GloTEC, TX relací a reportů, zobrazit toleranci časového přiřazení a uložit hash vstupního snapshotu i RX sítě.
 
 ### 1. NEC baseline
 
@@ -305,4 +309,4 @@ Propagation Intelligence naváže na reprodukovatelná data z milníku 9 a vztá
 - [ ] Hierarchický experimentální model oddělující společný časový trend, stabilní rozdíly RX a směr, použitý pouze při dostatečně překrytém pokrytí.
 - [ ] Neměnný recept analýzy s verzí algoritmu, parametry, vstupním hashem a možností přesně zopakovat publikovaný výsledek.
 
-Pořadí milníků je záměrné: nejdříve se musí zachovat původ a srovnatelnost dat, poté lze spolehlivě plánovat měření a zapojit směrový hardware. Na dokončený základ 0.39.0 navážou operativní podmínky šíření, měřený a modelový stav ionosféry a teprve potom Propagation Intelligence vztažená ke konkrétní trase, času a pásmu. Nad tímto podkladem vzniknou tři oddělené analytické vrstvy (NEC, raw coverage a propagation-normalized odhad), následované reprodukovatelnými reporty, validací prostředí stanoviště, asistovaným řízením a falsifikačními testy.
+Pořadí milníků je záměrné: nejdříve se musí zachovat původ a srovnatelnost dat, poté lze spolehlivě plánovat měření a zapojit směrový hardware. Dokončený milník 9 ve verzi 0.40.0 poskytuje operativní podmínky šíření, měřený a modelový stav ionosféry a reprodukovatelný podklad pro Propagation Intelligence vztaženou ke konkrétní trase, času a pásmu. Nad tímto podkladem vzniknou tři oddělené analytické vrstvy (NEC, raw coverage a propagation-normalized odhad), následované reprodukovatelnými reporty, validací prostředí stanoviště, asistovaným řízením a falsifikačními testy.

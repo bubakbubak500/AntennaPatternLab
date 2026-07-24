@@ -13,8 +13,14 @@ from .campaigns import CampaignAttachment, CampaignLogEntry, MeasurementCampaign
 from .domain import Spot
 from .experiments import TxSessionSummary
 from .exposure import ActivityWindow, ExposureObservation
+from .geo import grid_distance_and_bearing
 from .profiles import AntennaProfile
 from .propagation import PropagationSnapshot
+from .propagation_analysis import (
+    CampaignPropagationAnalysis,
+    PropagationRecord,
+    analyze_campaign_conditions,
+)
 
 
 class DatabaseMigrationError(RuntimeError):
@@ -748,6 +754,55 @@ class SpotRepository:
                 (campaign_id, limit),
             ).fetchall()
         return [_row_to_propagation_snapshot(row) for row in rows]
+
+    def analyze_campaign_propagation(
+        self,
+        campaign_id: int,
+    ) -> CampaignPropagationAnalysis:
+        with self._connect() as connection:
+            campaign = connection.execute(
+                "SELECT 1 FROM measurement_campaigns WHERE id = ?",
+                (campaign_id,),
+            ).fetchone()
+            if campaign is None:
+                raise ValueError("Measurement campaign does not exist.")
+            rows = connection.execute(
+                """
+                SELECT s.observed_at, s.band, s.mode, s.rx_call, s.rx_grid,
+                       s.tx_grid, s.snr_db, p.power_w
+                       , s.tx_session_id
+                FROM spots s
+                LEFT JOIN tx_sessions t ON t.id = s.tx_session_id
+                LEFT JOIN antenna_profiles p ON p.id = t.antenna_profile_id
+                WHERE s.campaign_id = ?
+                ORDER BY s.observed_at
+                """,
+                (campaign_id,),
+            ).fetchall()
+        records = []
+        for row in rows:
+            try:
+                _distance, bearing = grid_distance_and_bearing(
+                    row["tx_grid"], row["rx_grid"]
+                )
+            except ValueError:
+                continue
+            records.append(
+                PropagationRecord(
+                    datetime.fromisoformat(row["observed_at"]),
+                    row["band"],
+                    row["mode"],
+                    row["power_w"],
+                    row["rx_call"],
+                    bearing,
+                    row["snr_db"],
+                    row["tx_session_id"],
+                )
+            )
+        return analyze_campaign_conditions(
+            records,
+            self.list_propagation_snapshots(campaign_id),
+        )
 
     def import_campaign_attachment(
         self,

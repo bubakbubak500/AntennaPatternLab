@@ -104,19 +104,40 @@ a measurement. The screen does not make any network request when opened. Press
 and images.
 
 The overview includes planetary Kp, F10.7 flux, the latest available observed
-sunspot number, solar-wind speed, IMF Bt/Bz, and NOAA R/S/G scales. Separate
-panels show D-RAP D-region absorption, the northern auroral-oval forecast, and
-GOES SUVI 195 Å solar imagery.
+sunspot number, solar-wind speed, IMF Bt/Bz, and NOAA R/S/G scales. The
+**24 h trends** tab adds GOES X-ray and ≥10 MeV proton flux, flare timing,
+solar-wind speed, density and dynamic pressure, Bt/Bz, and Kyoto Dst. The
+planning tab separates NOAA observations, alerts, forecasts, and the WSA–ENLIL
+model; it includes three-day probabilities and the longer Ap/F10.7 outlook.
+
+The image tab shows the northern auroral-oval forecast and GOES SUVI 195 Å
+imagery. D-RAP can be selected at 5, 10, 15, 20, 25, or 30 MHz, and the NOAA
+history can be opened from the same tab.
+
+When a campaign has a valid transmitter locator, the explicit refresh also
+queries nearby Lowell GIRO/DIDBase ionosondes for `foF2`, `hmF2`, and
+`MUF(3000)`. Enter an optional target locator on the **Ionosphere** tab to add
+stations near a target area. Automatic scaling and manually validated values
+remain distinct. GIRO data are published under CC BY-NC-SA 4.0 and retain their
+station provenance. The official NOAA GloTEC image is labelled as a model.
 
 Downloaded products are cached locally. Current, stale, partial, offline, and
 unavailable states remain visible. Select a campaign and use **Save snapshot to
 campaign** to preserve normalized values, UTC timestamps, the canonical NOAA
-JSON source rows used, and their SHA-256. Stored snapshots appear in the
-campaign timeline.
+JSON source products and GIRO rows used, and their SHA-256. Stored snapshots
+appear in the campaign timeline and can be loaded again without a network
+connection.
+
+**Campaign comparability** overlays half-hour condition intervals with reports
+and TX sessions. It separates band, mode, profile power, and receiver-network
+changes, marks intervals unsuitable for direct A/B comparison, and shows how
+sector medians change after omitting the strongest receiver, busiest hour, or
+most populated direction.
 
 Treat this information as measurement context. It is not a point-to-point
 propagation forecast and does not turn coverage reports into calibrated antenna
-gain.
+gain. `foF2`, MUF, and TEC are situational evidence, not a guarantee that a
+specific path will open and not an automatic correction of SNR.
 
 ## 9. Import and export
 

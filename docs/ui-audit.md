@@ -500,3 +500,62 @@ Verification:
 - full suite: `165 passed in 13.55s`;
 - 100%, 200%, Monitor Light, Monitor Dark, Classic, Czech, English, empty,
   populated, and stored-timeline states inspected.
+
+## 0.40 milestone 9 completion validation
+
+The expanded real `PropagationConditionsDialog` was rendered on 2026-07-24
+against an isolated database with representative NOAA, GIRO, GloTEC, TX-session,
+and campaign-report data. A separate production integration check exercised the
+official public endpoints after the operator-authorized refresh boundary. No
+collector, radio, rotator, transmission, or hardware command was started.
+
+Final evidence under [`docs/ui/after`](ui/after/) now includes:
+
+- `dialog-propagation-eng-dark-trends.png`: GOES X-ray/proton, solar-wind
+  speed/density/dynamic-pressure, Bt/Bz, and Dst series;
+- `dialog-propagation-eng-dark-planning.png`: NOAA alerts, WSA–ENLIL model
+  context, three-day probabilities, and long-range Ap/F10.7;
+- `dialog-propagation-cze-light-ionosphere.png`: nearest GIRO station,
+  scaling quality, qualitative band view, and GloTEC model;
+- `dialog-propagation-eng-dark-images.png`: selectable-frequency D-RAP,
+  auroral oval, and SUVI products;
+- `dialog-propagation-eng-classic-timeline.png`: stored-snapshot replay in
+  Classic;
+- `dialog-propagation-eng-light-analysis.png`: half-hour campaign/TX overlay
+  and sensitivity cases;
+- the existing empty, Czech overview, and 1920×1080 overview captures,
+  regenerated for the seven-tab dialog.
+
+The same nine states were rendered with `QT_SCALE_FACTOR=2`. The long Czech
+license explanation, optional target-locator form, technical tables, charts,
+GloTEC panel, tab scrolling at the 900×620 minimum, source lines, and Close
+button remained reachable without overlap. The ionosphere table intentionally
+uses horizontal scrolling at the narrow breakpoint so no technical column is
+silently removed.
+
+The first visual pass found and corrected:
+
+1. the ionosphere split gave the band summary too much width and clipped the
+   station-distance column;
+2. raw internal campaign-analysis flag names were exposed instead of localized
+   Czech/English terms;
+3. the long-range forecast initially sorted newest-first rather than in planning
+   order;
+4. the solar-wind chart omitted density/dynamic pressure and the Bt/Bz pair
+   even though the current-value overview already exposed them.
+
+The final review found no obvious P0 or P1 visual issue. Observations,
+forecasts, and models retain explicit labels; missing values remain visible;
+the graphs do not interpolate absent evidence; GIRO automatic/manual quality
+and license text remain readable; and stored campaign evidence can be replayed
+without network access.
+
+Verification:
+
+- production endpoints: all NOAA JSON/image products loaded with zero errors;
+  1,438 X-ray points, 287 ≥10 MeV proton points, 1,426 joined solar-wind
+  points, 100 classified alerts, and 45 forecast days parsed;
+- GIRO production query: PQ052 (261 rows) and MZ152 (59 rows), zero errors;
+- full suite after implementation: `173 passed`;
+- 100% and 200% rendered state matrix inspected;
+- `git diff --check` clean.
