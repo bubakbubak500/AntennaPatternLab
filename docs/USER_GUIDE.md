@@ -207,7 +207,27 @@ the temporary directory. The stored result contains the exact model revision,
 engine path/version, UTC time, command parameters, input/output SHA-256, and
 normal NEC output. The result tabs show R/X and 50 Ω SWR over frequency, wire
 currents, peak and front/back values, selectable absolute/relative azimuth and
-elevation cuts, and a mouse-rotatable 3D far-field surface.
+elevation cuts, and a mouse-rotatable 3D far-field surface. NEC reports
+`theta` from the zenith; the workbench converts it to the operational take-off
+elevation `90° − theta`, where `0°` is the horizon and `90°` is straight up.
+The 3D view draws the horizon plane, azimuth references, and the peak ray so a
+low or high lobe is not inferred from the viewing perspective.
+
+**Practical interpretation** reports the peak elevation/azimuth, approximate
+relative power shares in the `0–10°`, `10–30°`, and `30–90°` upper-hemisphere
+bands, and the radio horizon from the highest modeled point. It also gives
+spherical-Earth one-hop geometry for assumed virtual heights of 110 km
+(representative E region) and 300 km (representative F2 peak). The layer ranges
+are consistent with the [NOAA ionospheric-region
+definitions](https://www.ngdc.noaa.gov/stp/IONO/ionostru.html); this simple
+geometry is deliberately not an [ITU-R P.533 HF propagation
+prediction](https://www.itu.int/rec/R-REC-P.533/en).
+
+The displayed hop distance does **not** establish that the selected frequency
+will be supported. It excludes current foF2/MUF, D-region absorption, refraction
+details, terrain, receiver height, polarization mismatch, and link budget.
+The NEC far-field surface also does not calculate ground-wave coverage, which
+depends on polarization, frequency, ground conductivity, terrain, and loss.
 
 Saved independent baselines automatically appear in **Propagation
 Intelligence → Three layers**, next to raw observed coverage and the separate
@@ -216,7 +236,7 @@ height/ground combinations separately. Orientation selection uses only the
 training time blocks and always reports error on later, previously unused
 campaign blocks; it never replaces the original independent baseline.
 
-Version 0.42.0 intentionally supports a documented NEC2 subset: `GW`, `GE`,
+Version 0.43.0 intentionally supports a documented NEC2 subset: `GW`, `GE`,
 `GN`, voltage `EX 0`, series-RLC `LD 0`, linear `FR`, and the generated `RP`.
 Unsupported cards are refused instead of silently discarded. Patches,
 buildings, volumetric solids, a real coax/feed-line model, full terrain,

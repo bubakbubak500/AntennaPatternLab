@@ -211,7 +211,7 @@ class AntennaModel:
             raise ValueError("; ".join(issue.message for issue in errors))
         lines = [
             f"CM APL-MODEL {self.schema} {self.sha256}",
-            f"CM NAME {self.name}",
+            "CM NAME-JSON " + json.dumps(self.name, ensure_ascii=True),
             f"CM ORIENTATION-DEG {self.orientation_deg:.6f}",
             "CE",
         ]
@@ -362,7 +362,9 @@ def parse_nec_deck(text: str, *, name: str = "Imported NEC model") -> AntennaMod
         card = fields[0].upper()
         if card == "CM":
             body = line[2:].strip()
-            if body.upper().startswith("NAME "):
+            if body.upper().startswith("NAME-JSON "):
+                parsed_name = str(json.loads(body.split(None, 1)[1]))
+            elif body.upper().startswith("NAME "):
                 parsed_name = body[5:].strip() or parsed_name
             elif body.upper().startswith("ORIENTATION-DEG "):
                 orientation = float(body.split(None, 1)[1])

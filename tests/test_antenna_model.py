@@ -51,6 +51,27 @@ def test_generated_nec_supported_subset_round_trips_without_geometry_loss():
     assert restored.sha256 == original.sha256
 
 
+def test_generated_nec_preserves_unicode_name_in_ascii_deck():
+    original = antenna_template("yagi")
+    original = AntennaModel(
+        "3-element Yagi · Δh −2 m · reálná zem",
+        original.wires,
+        original.excitations,
+        original.loads,
+        original.ground,
+        original.frequency,
+        original.orientation_deg,
+    )
+
+    deck = original.to_nec()
+    restored = parse_nec_deck(deck)
+
+    assert deck.isascii()
+    assert "CM NAME-JSON" in deck
+    assert restored.name == original.name
+    assert restored.sha256 == original.sha256
+
+
 def test_parser_refuses_unsupported_cards_instead_of_silently_losing_them():
     deck = antenna_template("dipole").to_nec().replace("EN\n", "SP 0 0 0 0\nEN\n")
 

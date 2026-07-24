@@ -49,8 +49,9 @@ confirmation.
   replay, versioned provenance, blocked validation, and separate NEC,
   observed-coverage, and propagation-normalized layers;
 - built-in NEC2 wire-modeling workbench with five templates, validation,
-  3D geometry, impedance/current/pattern results, reproducible baselines, and
-  an optional separately installed OpenNEC calculation process;
+  3D geometry, impedance/current/pattern results, explicit take-off elevation,
+  practical ionospheric-hop geometry, reproducible baselines, and an optional
+  separately installed OpenNEC calculation process;
 - ADIF/ADI and CSV import, plus CSV export;
 - local SQLite storage and diagnostic export;
 - English and Czech application UI;

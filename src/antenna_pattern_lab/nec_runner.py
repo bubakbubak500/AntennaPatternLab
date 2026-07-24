@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-from math import sqrt
+from math import atan2, cos, radians, sin, sqrt
 import os
 from pathlib import Path
 import re
@@ -51,6 +51,21 @@ class CurrentSample:
     segment: int
     magnitude_a: float
     phase_deg: float
+
+
+@dataclass(frozen=True, slots=True)
+class RadiationInterpretation:
+    peak_gain_db: float
+    peak_elevation_deg: float
+    peak_azimuth_deg: float
+    low_angle_fraction: float
+    medium_angle_fraction: float
+    high_angle_fraction: float
+    antenna_height_m: float
+    radio_horizon_km: float
+    e_layer_hop_km: float
+    f2_layer_hop_km: float
+    use_case: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +137,114 @@ def select_azimuth_cut(
         )
     )
     return theta, rows
+
+
+def estimate_ionospheric_hop_distance_km(
+    elevation_deg: float,
+    virtual_height_km: float,
+    *,
+    earth_radius_km: float = 6371.0088,
+) -> float:
+    """Return a spherical-Earth, symmetric one-hop ground distance.
+
+    The ray is projected from the surface to an assumed virtual layer and
+    mirrored at the path midpoint. This is geometry only, not an ionospheric
+    propagation or maximum-usable-frequency prediction.
+    """
+    if not 0.0 <= elevation_deg <= 90.0:
+        raise ValueError("Elevation must be between 0 and 90 degrees.")
+    if virtual_height_km <= 0 or earth_radius_km <= 0:
+        raise ValueError("Layer height and Earth radius must be positive.")
+    elevation = radians(elevation_deg)
+    radial = earth_radius_km * sin(elevation)
+    ray_length = -radial + sqrt(
+        radial * radial
+        + 2.0 * earth_radius_km * virtual_height_km
+        + virtual_height_km * virtual_height_km
+    )
+    central_angle = atan2(
+        ray_length * cos(elevation),
+        earth_radius_km + ray_length * sin(elevation),
+    )
+    return 2.0 * earth_radius_km * central_angle
+
+
+def estimate_radio_horizon_km(
+    antenna_height_m: float,
+    *,
+    earth_radius_km: float = 6371.0088,
+    effective_earth_factor: float = 4.0 / 3.0,
+) -> float:
+    """Approximate the standard-atmosphere radio horizon to ground level."""
+    if antenna_height_m < 0:
+        raise ValueError("Antenna height must not be negative.")
+    if earth_radius_km <= 0 or effective_earth_factor <= 0:
+        raise ValueError("Earth radius and effective-Earth factor must be positive.")
+    height_km = antenna_height_m / 1000.0
+    effective_radius = earth_radius_km * effective_earth_factor
+    return sqrt(2.0 * effective_radius * height_km + height_km * height_km)
+
+
+def interpret_radiation_pattern(
+    samples: tuple[RadiationSample, ...] | list[RadiationSample],
+    *,
+    antenna_height_m: float,
+) -> RadiationInterpretation | None:
+    """Summarize the sampled upper-hemisphere far-field pattern.
+
+    Angular shares integrate relative linear power with the spherical
+    ``sin(theta)`` solid-angle weight. They describe the NEC pattern only and
+    intentionally do not claim a link budget or propagation probability.
+    """
+    usable = [
+        item
+        for item in samples
+        if item.gain_db > -900 and -0.01 <= item.theta_deg <= 90.01
+    ]
+    if not usable:
+        return None
+    peak = max(usable, key=lambda item: item.gain_db)
+    weighted = [0.0, 0.0, 0.0]
+    for item in usable:
+        elevation = max(0.0, min(90.0, 90.0 - item.theta_deg))
+        relative_power = 10.0 ** ((item.gain_db - peak.gain_db) / 10.0)
+        solid_angle_weight = max(0.0, sin(radians(item.theta_deg)))
+        bucket = 0 if elevation < 10.0 else 1 if elevation < 30.0 else 2
+        weighted[bucket] += relative_power * solid_angle_weight
+    total = sum(weighted)
+    fractions = (
+        tuple(value / total for value in weighted)
+        if total > 0
+        else (0.0, 0.0, 0.0)
+    )
+    peak_elevation = max(0.0, min(90.0, 90.0 - peak.theta_deg))
+    if peak_elevation < 5.0:
+        use_case = "grazing"
+    elif peak_elevation < 15.0:
+        use_case = "low"
+    elif peak_elevation < 35.0:
+        use_case = "medium"
+    elif peak_elevation < 60.0:
+        use_case = "high"
+    else:
+        use_case = "near_vertical"
+    return RadiationInterpretation(
+        peak_gain_db=peak.gain_db,
+        peak_elevation_deg=peak_elevation,
+        peak_azimuth_deg=peak.phi_deg % 360.0,
+        low_angle_fraction=fractions[0],
+        medium_angle_fraction=fractions[1],
+        high_angle_fraction=fractions[2],
+        antenna_height_m=antenna_height_m,
+        radio_horizon_km=estimate_radio_horizon_km(antenna_height_m),
+        e_layer_hop_km=estimate_ionospheric_hop_distance_km(
+            peak_elevation, 110.0
+        ),
+        f2_layer_hop_km=estimate_ionospheric_hop_distance_km(
+            peak_elevation, 300.0
+        ),
+        use_case=use_case,
+    )
 
 
 def run_opennec(

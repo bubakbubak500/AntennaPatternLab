@@ -84,6 +84,10 @@ def test_workbench_saves_model_revision_and_renders_all_result_views(tmp_path, m
     assert dialog.current_table.rowCount() == 1
     assert result.output_sha256 in dialog.provenance.toPlainText()
     assert dialog.repository.list_nec_runs(purpose="independent_baseline")
+    assert dialog.result_figure.axes[3].get_xlabel() == "Elevation above horizon (°)"
+    assert "30.0°" in dialog.takeoff_value.text()
+    assert "934 km" in dialog.f2_hop_value.text()
+    assert "does not calculate ground wave" in dialog.groundwave_value.text()
     dialog.close()
 
 
@@ -104,4 +108,5 @@ def test_candidate_grid_covers_height_and_ground_parameters(tmp_path, monkeypatc
         "free_space",
     }
     assert {metadata.split("|")[1] for _model, metadata in captured} == {"-1.0", "2.0"}
+    assert all(model.to_nec().isascii() for model, _metadata in captured)
     dialog.close()

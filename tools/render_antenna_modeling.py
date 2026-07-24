@@ -53,7 +53,7 @@ def result_for(model):
             theta,
             phi,
             7.1
-            - abs(theta - 45) / 12
+            - abs(theta - 60) / 12
             - 8 * abs(__import__("math").sin(__import__("math").radians(phi))),
         )
         for theta in range(0, 91, 5)
@@ -94,9 +94,11 @@ def main() -> int:
     scenarios = (
         ("cze-light-model-1180x720", "CZE", DesignStyle.MONITOR, ThemePreference.LIGHT, (1180, 720), 0),
         ("eng-dark-results-1366x850", "ENG", DesignStyle.MONITOR, ThemePreference.DARK, (1366, 850), 1),
+        ("cze-light-radiation3d-1180x720", "CZE", DesignStyle.MONITOR, ThemePreference.LIGHT, (1180, 720), 2),
+        ("eng-dark-radiation3d-1366x850", "ENG", DesignStyle.MONITOR, ThemePreference.DARK, (1366, 850), 2),
         ("eng-dark-radiation3d-1920x1080", "ENG", DesignStyle.MONITOR, ThemePreference.DARK, (1920, 1080), 2),
         ("cze-light-candidates-1180x720", "CZE", DesignStyle.MONITOR, ThemePreference.LIGHT, (1180, 720), 3),
-        ("eng-classic-model-1180x720", "ENG", DesignStyle.CLASSIC, ThemePreference.SYSTEM, (1180, 720), 0),
+        ("eng-classic-radiation3d-1180x720", "ENG", DesignStyle.CLASSIC, ThemePreference.SYSTEM, (1180, 720), 2),
     )
     with tempfile.TemporaryDirectory(prefix="antenna-modeling-ui-", ignore_cleanup_errors=True) as directory:
         for suffix, language, style, theme, size, tab in scenarios:
@@ -131,7 +133,7 @@ def main() -> int:
                     label=f"Δh {offset:+g} m · {kind}",
                 )
             dialog = AntennaModelingDialog(repository, language)
-            dialog._saved_model_selected()
+            dialog._load_model(model)
             dialog.result = result
             dialog._render_result()
             dialog._candidate_runs = [
@@ -139,9 +141,10 @@ def main() -> int:
                 for run in repository.list_nec_runs(purpose="assisted_candidate")
             ]
             dialog._render_candidates()
-            dialog.tabs.setCurrentIndex(tab)
             dialog.resize(*size)
             dialog.show()
+            application.processEvents()
+            dialog.tabs.setCurrentIndex(tab)
             application.processEvents()
             destination = OUTPUT / f"dialog-antenna-modeling-{suffix}.png"
             if not dialog.grab().save(str(destination)):

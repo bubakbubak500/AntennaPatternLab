@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antenna-pattern-lab"
-version = "0.42.0"
+version = "0.43.0"
 description = "Empirical antenna coverage analysis from PSK Reporter FT8 spots"
 readme = "README.md"
 requires-python = ">=3.11"

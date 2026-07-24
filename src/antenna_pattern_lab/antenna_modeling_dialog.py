@@ -55,6 +55,7 @@ from .nec_runner import (
     NecRunCancelled,
     NecRunError,
     NecRunResult,
+    interpret_radiation_pattern,
     run_opennec,
     select_azimuth_cut,
 )
@@ -71,6 +72,7 @@ TEXT = {
         "radiation3d": "Vyzařování 3D",
         "candidates": "Asistované varianty",
         "new": "Nový z šablony",
+        "create": "Vytvořit",
         "load": "Uložené revize:",
         "save": "Uložit revizi",
         "import": "Importovat…",
@@ -104,6 +106,21 @@ TEXT = {
         "grounds": "Varianty země",
         "solve_candidates": "Vypočítat mřížku variant",
         "open_compare": "Porovnat s měřením a validovat…",
+        "drag_hint": "Tažením otáčejte · kolečkem přibližujte",
+        "practical": "Praktická interpretace",
+        "peak_takeoff": "Maximum",
+        "angle_power": "Podíl výkonu diagramu",
+        "radio_horizon": "Rádiový horizont vrcholu",
+        "e_hop": "1 skok · E 110 km",
+        "f2_hop": "1 skok · F2 300 km",
+        "expected_use": "Pravděpodobné použití",
+        "groundwave": "Přízemní vlna",
+        "groundwave_note": "Tento far-field diagram přízemní vlnu nepočítá; závisí také na polarizaci, frekvenci, vodivosti země, terénu a ztrátách.",
+        "estimate_note": "Podíly integrují vzorkovaný horní poloprostor. Vzdálenosti jsou pouze geometrický odhad nad kulovou Zemí pro předpokládanou virtuální výšku vrstvy. Nezahrnují MUF/foF2, absorpci, okamžitý stav ionosféry ani link budget.",
+        "no_pattern": "Nejprve vypočítejte baseline s vyzařovacím diagramem.",
+        "takeoff_axis": "Elevace nad horizontem (°)",
+        "gain_axis": "Zisk (dB)",
+        "horizon_plane": "horizont / zem",
         "limits": "Rozsah NEC2 v1",
         "close": "Zavřít",
     },
@@ -115,6 +132,7 @@ TEXT = {
         "radiation3d": "3D radiation",
         "candidates": "Assisted variants",
         "new": "New from template",
+        "create": "Create",
         "load": "Saved revisions:",
         "save": "Save revision",
         "import": "Import…",
@@ -148,8 +166,40 @@ TEXT = {
         "grounds": "Ground variants",
         "solve_candidates": "Calculate candidate grid",
         "open_compare": "Compare with measurements and validate…",
+        "drag_hint": "Drag to rotate · wheel to zoom",
+        "practical": "Practical interpretation",
+        "peak_takeoff": "Pattern peak",
+        "angle_power": "Pattern power share",
+        "radio_horizon": "Apex radio horizon",
+        "e_hop": "1 hop · E 110 km",
+        "f2_hop": "1 hop · F2 300 km",
+        "expected_use": "Likely use",
+        "groundwave": "Ground wave",
+        "groundwave_note": "This far-field pattern does not calculate ground wave; it also depends on polarization, frequency, ground conductivity, terrain, and loss.",
+        "estimate_note": "Shares integrate the sampled upper hemisphere. Distances are geometric spherical-Earth estimates for assumed virtual layer heights only. They do not include MUF/foF2, absorption, current ionospheric support, or a link budget.",
+        "no_pattern": "Calculate a baseline with radiation data first.",
+        "takeoff_axis": "Elevation above horizon (°)",
+        "gain_axis": "Gain (dB)",
+        "horizon_plane": "horizon / ground",
         "limits": "NEC2 v1 scope",
         "close": "Close",
+    },
+}
+
+USE_CASE_TEXT = {
+    "CZE": {
+        "grazing": "Velmi nízký úhel: dálkové skywave/DX, silně citlivé na terén a překážky.",
+        "low": "Nízký úhel: převážně dálkové skywave/DX.",
+        "medium": "Střední úhel: regionální až dálkové skywave podle aktuální ionosféry.",
+        "high": "Vysoký úhel: kratší regionální skywave; NVIS jen pokud jej pásmo a ionosféra podporují.",
+        "near_vertical": "Téměř svislé vyzařování: krátké trasy/NVIS jen při vhodném pásmu a ionosféře.",
+    },
+    "ENG": {
+        "grazing": "Very low angle: long-distance skywave/DX, highly sensitive to terrain and obstructions.",
+        "low": "Low angle: predominantly long-distance skywave/DX.",
+        "medium": "Medium angle: regional to long-distance skywave, subject to current ionospheric support.",
+        "high": "High angle: shorter regional skywave; NVIS only when the band and ionosphere support it.",
+        "near_vertical": "Near-vertical radiation: short paths/NVIS only with a suitable band and ionosphere.",
     },
 }
 
@@ -225,6 +275,8 @@ class AntennaModelingDialog(QDialog):
         self.tabs.addTab(self._build_results_tab(), self.text["results"])
         self.tabs.addTab(self._build_3d_tab(), self.text["radiation3d"])
         self.tabs.addTab(self._build_candidates_tab(), self.text["candidates"])
+        self.tabs.tabBar().setUsesScrollButtons(False)
+        self.tabs.tabBar().setElideMode(Qt.TextElideMode.ElideRight)
         root.addWidget(self.tabs, 1)
 
         footer = QHBoxLayout()
@@ -240,6 +292,8 @@ class AntennaModelingDialog(QDialog):
         self._reload_saved_models()
 
     def _build_toolbar(self):
+        toolbar = QVBoxLayout()
+        toolbar.setSpacing(4)
         row = QHBoxLayout()
         row.addWidget(QLabel(self.text["new"]))
         self.template = QComboBox()
@@ -252,6 +306,7 @@ class AntennaModelingDialog(QDialog):
         ):
             self.template.addItem(label, value)
         self.new_button = QPushButton(self.text["new"])
+        self.new_button.setText(self.text["create"])
         self.new_button.clicked.connect(self._new_template)
         row.addWidget(self.template)
         row.addWidget(self.new_button)
@@ -271,6 +326,10 @@ class AntennaModelingDialog(QDialog):
         row.addWidget(self.import_button)
         row.addWidget(self.export_button)
         row.addStretch(1)
+        toolbar.addLayout(row)
+
+        actions = QHBoxLayout()
+        actions.addStretch(1)
         self.run_button = QPushButton(self.text["run"])
         self.run_button.setProperty("buttonRole", "primary")
         self.run_button.setEnabled(self.solver_path is not None)
@@ -278,9 +337,10 @@ class AntennaModelingDialog(QDialog):
         self.cancel_button = QPushButton(self.text["cancel"])
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self._cancel_run)
-        row.addWidget(self.run_button)
-        row.addWidget(self.cancel_button)
-        return row
+        actions.addWidget(self.run_button)
+        actions.addWidget(self.cancel_button)
+        toolbar.addLayout(actions)
+        return toolbar
 
     def _build_model_tab(self):
         page = QWidget()
@@ -450,16 +510,58 @@ class AntennaModelingDialog(QDialog):
     def _build_3d_tab(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        hint = QLabel(
-            "Drag to rotate · wheel to zoom"
-            if self.language == "ENG"
-            else "Tažením otáčejte · kolečkem přibližujte"
-        )
+        hint = QLabel(self.text["drag_hint"])
         layout.addWidget(hint)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         self.radiation_figure = Figure(figsize=(9, 7))
         self.radiation_canvas = FigureCanvasQTAgg(self.radiation_figure)
         self.radiation_canvas.setAccessibleName("Rotatable three-dimensional radiation pattern")
-        layout.addWidget(self.radiation_canvas)
+        splitter.addWidget(self.radiation_canvas)
+
+        interpretation = DataPanel()
+        interpretation.setMinimumWidth(285)
+        info_layout = QVBoxLayout(interpretation)
+        info_layout.setContentsMargins(12, 10, 12, 10)
+        info_layout.addWidget(PanelHeader(self.text["practical"]))
+        form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        self.takeoff_value = QLabel("—")
+        self.takeoff_value.setAccessibleName(self.text["peak_takeoff"])
+        self.takeoff_value.setWordWrap(True)
+        self.angle_power_value = QLabel("—")
+        self.angle_power_value.setWordWrap(True)
+        self.horizon_value = QLabel("—")
+        self.e_hop_value = QLabel("—")
+        self.f2_hop_value = QLabel("—")
+        self.use_value = QLabel(self.text["no_pattern"])
+        self.use_value.setWordWrap(True)
+        self.groundwave_value = QLabel(self.text["groundwave_note"])
+        self.groundwave_value.setWordWrap(True)
+        for label, widget in (
+            (self.text["peak_takeoff"], self.takeoff_value),
+            (self.text["angle_power"], self.angle_power_value),
+            (self.text["radio_horizon"], self.horizon_value),
+            (self.text["e_hop"], self.e_hop_value),
+            (self.text["f2_hop"], self.f2_hop_value),
+        ):
+            form.addRow(label, widget)
+        info_layout.addLayout(form)
+        use_label = QLabel(self.text["expected_use"])
+        use_label.setObjectName("Metadata")
+        info_layout.addWidget(use_label)
+        info_layout.addWidget(self.use_value)
+        groundwave_label = QLabel(self.text["groundwave"])
+        groundwave_label.setObjectName("Metadata")
+        info_layout.addWidget(groundwave_label)
+        info_layout.addWidget(self.groundwave_value)
+        info_layout.addStretch(1)
+        estimate = QLabel(self.text["estimate_note"])
+        estimate.setObjectName("Metadata")
+        estimate.setWordWrap(True)
+        info_layout.addWidget(estimate)
+        splitter.addWidget(interpretation)
+        splitter.setSizes((880, 320))
+        layout.addWidget(splitter, 1)
         return page
 
     def _build_candidates_tab(self):
@@ -861,6 +963,7 @@ class AntennaModelingDialog(QDialog):
             self.frequency_choice.blockSignals(False)
             self.current_table.setRowCount(0)
             self.provenance.clear()
+            self._render_interpretation(None)
             return
         radiation_frequencies = tuple(
             dict.fromkeys(item.frequency_hz for item in self.result.radiation)
@@ -877,11 +980,24 @@ class AntennaModelingDialog(QDialog):
         relative = self.gain_mode.currentData() == "relative"
         radiation = [item for item in self.result.radiation if item.frequency_hz == frequency]
         peak = max((item.gain_db for item in radiation), default=0.0)
+        peak_sample = max(radiation, key=lambda item: item.gain_db) if radiation else None
+        antenna_height = max(
+            (
+                point.z_m
+                for wire in self.model.wires
+                for point in (wire.start, wire.end)
+            ),
+            default=0.0,
+        )
+        interpretation = interpret_radiation_pattern(
+            radiation,
+            antenna_height_m=antenna_height,
+        )
 
         impedance_axis = self.result_figure.add_subplot(221)
         swr_axis = self.result_figure.add_subplot(222)
         azimuth_axis = self.result_figure.add_subplot(223, projection="polar")
-        elevation_axis = self.result_figure.add_subplot(224, projection="polar")
+        elevation_axis = self.result_figure.add_subplot(224)
         frequencies_mhz = [item.frequency_hz / 1e6 for item in self.result.impedance]
         impedance_axis.plot(frequencies_mhz, [item.resistance_ohm for item in self.result.impedance], label="R Ω")
         impedance_axis.plot(frequencies_mhz, [item.reactance_ohm for item in self.result.impedance], label="X Ω")
@@ -895,33 +1011,74 @@ class AntennaModelingDialog(QDialog):
         swr_axis.set_xlabel("MHz")
         azimuth_theta, azimuth_samples = select_azimuth_cut(radiation)
         azimuth = [(item.phi_deg, item.gain_db) for item in azimuth_samples]
-        elevation = sorted((item.theta_deg, item.gain_db) for item in radiation if abs(item.phi_deg) <= 0.2)
-        for axis, rows, title in (
+        azimuth_values = [
+            (radians(angle), gain - peak if relative else gain)
+            for angle, gain in azimuth
+        ]
+        if azimuth_values:
+            azimuth_axis.plot(
+                [item[0] for item in azimuth_values],
+                [item[1] for item in azimuth_values],
+                color=TOKENS.accent,
+            )
+            if relative:
+                azimuth_axis.set_ylim(
+                    min(-30.0, min(item[1] for item in azimuth_values)),
+                    0.0,
+                )
+        azimuth_axis.set_theta_zero_location("N")
+        azimuth_axis.set_theta_direction(-1)
+        azimuth_axis.set_title(
+            f"Azimuth · elevation {90.0 - azimuth_theta:.0f}°"
+            if azimuth_theta is not None
+            else "Azimuth"
+        )
+
+        cut_phi = peak_sample.phi_deg if peak_sample is not None else 0.0
+        elevation = sorted(
             (
-                azimuth_axis,
-                azimuth,
-                (
-                    f"Azimuth θ={azimuth_theta:.0f}°"
-                    if azimuth_theta is not None
-                    else "Azimuth"
-                ),
-            ),
-            (elevation_axis, elevation, "Elevation φ=0°"),
-        ):
-            values = [(radians(angle), gain - peak if relative else gain) for angle, gain in rows]
-            if values:
-                axis.plot([item[0] for item in values], [item[1] for item in values], color=TOKENS.accent)
-                if relative:
-                    axis.set_ylim(min(-30.0, min(item[1] for item in values)), 0.0)
-            axis.set_theta_zero_location("N")
-            axis.set_theta_direction(-1)
-            axis.set_title(title)
+                90.0 - item.theta_deg,
+                item.gain_db - peak if relative else item.gain_db,
+            )
+            for item in radiation
+            if abs((item.phi_deg - cut_phi + 180.0) % 360.0 - 180.0) <= 0.2
+        )
+        if elevation:
+            elevation_axis.plot(
+                [item[0] for item in elevation],
+                [item[1] for item in elevation],
+                color=TOKENS.accent,
+            )
+            if relative:
+                elevation_axis.set_ylim(
+                    min(-30.0, min(item[1] for item in elevation)),
+                    0.0,
+                )
+        if interpretation is not None:
+            elevation_axis.axvline(
+                interpretation.peak_elevation_deg,
+                color=TOKENS.warning,
+                linestyle="--",
+                linewidth=0.9,
+            )
+        elevation_axis.set_xlim(0.0, 90.0)
+        elevation_axis.set_xticks((0, 15, 30, 45, 60, 75, 90))
+        elevation_axis.set_xlabel(self.text["takeoff_axis"])
+        elevation_axis.set_ylabel(self.text["gain_axis"])
+        elevation_axis.set_title(f"Vertical cut · azimuth {cut_phi:.0f}°")
+        elevation_axis.grid(True, alpha=0.35)
         apply_figure_theme(self.result_figure)
         self.result_figure.tight_layout(pad=1.2)
         self.result_figure.subplots_adjust(hspace=0.62, wspace=0.24)
         self.result_canvas.draw_idle()
 
-        self._render_radiation_3d(radiation, peak, relative)
+        self._render_radiation_3d(
+            radiation,
+            peak,
+            relative,
+            interpretation,
+        )
+        self._render_interpretation(interpretation)
         front = self._nearest_gain(azimuth, self.model.orientation_deg)
         back = self._nearest_gain(azimuth, self.model.orientation_deg + 180)
         self.peak_card.value.setText(f"{peak:.2f} dBi" if radiation else "—")
@@ -942,8 +1099,36 @@ class AntennaModelingDialog(QDialog):
             f"Output SHA-256: {self.result.output_sha256}"
         )
 
-    def _render_radiation_3d(self, radiation, peak, relative):
+    def _render_radiation_3d(
+        self,
+        radiation,
+        peak,
+        relative,
+        interpretation,
+    ):
         axis = self.radiation_figure.add_subplot(111, projection="3d")
+        horizon_radius = np.linspace(0.0, 1.0, 2)
+        horizon_angle = np.linspace(0.0, 2.0 * np.pi, 145)
+        horizon_r, horizon_phi = np.meshgrid(horizon_radius, horizon_angle)
+        horizon_x = horizon_r * np.cos(horizon_phi)
+        horizon_y = horizon_r * np.sin(horizon_phi)
+        horizon_z = np.zeros_like(horizon_x)
+        axis.plot_surface(
+            horizon_x,
+            horizon_y,
+            horizon_z,
+            color=TOKENS.chart_grid,
+            alpha=0.14,
+            linewidth=0,
+            shade=False,
+        )
+        axis.plot(
+            np.cos(horizon_angle),
+            np.sin(horizon_angle),
+            np.zeros_like(horizon_angle),
+            color=TOKENS.chart_axis,
+            linewidth=0.8,
+        )
         if radiation:
             theta_values = sorted({item.theta_deg for item in radiation})
             phi_values = sorted({item.phi_deg % 360.0 for item in radiation})
@@ -985,14 +1170,82 @@ class AntennaModelingDialog(QDialog):
                 antialiased=True,
                 shade=True,
             )
+            if interpretation is not None:
+                peak_theta = radians(90.0 - interpretation.peak_elevation_deg)
+                peak_phi = radians(interpretation.peak_azimuth_deg)
+                peak_x = sin(peak_theta) * cos(peak_phi)
+                peak_y = sin(peak_theta) * sin(peak_phi)
+                peak_z = cos(peak_theta)
+                axis.plot(
+                    (0.0, peak_x),
+                    (0.0, peak_y),
+                    (0.0, peak_z),
+                    color=TOKENS.warning,
+                    linestyle="--",
+                    linewidth=1.1,
+                )
+                axis.scatter(
+                    (peak_x,),
+                    (peak_y,),
+                    (peak_z,),
+                    color=TOKENS.warning,
+                    s=28,
+                    depthshade=False,
+                )
+                axis.text(
+                    peak_x,
+                    peak_y,
+                    peak_z + 0.05,
+                    f"{interpretation.peak_elevation_deg:.0f}°",
+                )
+        for azimuth, label in ((0, "0°"), (90, "90°"), (180, "180°"), (270, "270°")):
+            angle = radians(azimuth)
+            axis.text(1.10 * cos(angle), 1.10 * sin(angle), 0.0, label)
+        axis.text2D(0.02, 0.05, self.text["horizon_plane"], transform=axis.transAxes)
         axis.set_xlabel("X")
         axis.set_ylabel("Y")
-        axis.set_zlabel("Z")
-        axis.set_box_aspect((1, 1, 1))
+        axis.set_zlabel("Up")
+        axis.set_xlim(-1.15, 1.15)
+        axis.set_ylim(-1.15, 1.15)
+        axis.set_zlim(0.0, 1.15)
+        axis.set_box_aspect((2, 2, 1), zoom=1.12)
+        axis.view_init(elev=25, azim=-55)
         axis.set_title("Far-field gain · " + ("relative dB" if relative else "absolute dBi"))
         apply_figure_theme(self.radiation_figure)
-        self.radiation_figure.tight_layout(pad=1)
+        self.radiation_figure.subplots_adjust(
+            left=-0.02,
+            right=1.02,
+            bottom=-0.02,
+            top=0.92,
+        )
         self.radiation_canvas.draw_idle()
+
+    def _render_interpretation(self, interpretation):
+        if interpretation is None:
+            self.takeoff_value.setText("—")
+            self.angle_power_value.setText("—")
+            self.horizon_value.setText("—")
+            self.e_hop_value.setText("—")
+            self.f2_hop_value.setText("—")
+            self.use_value.setText(self.text["no_pattern"])
+            return
+        self.takeoff_value.setText(
+            f"{interpretation.peak_elevation_deg:.1f}° ↑ · "
+            f"az {interpretation.peak_azimuth_deg:.0f}°\n"
+            f"{interpretation.peak_gain_db:.2f} dBi"
+        )
+        self.angle_power_value.setText(
+            f"0–10°: {interpretation.low_angle_fraction:.0%}\n"
+            f"10–30°: {interpretation.medium_angle_fraction:.0%}\n"
+            f"30–90°: {interpretation.high_angle_fraction:.0%}"
+        )
+        self.horizon_value.setText(
+            f"≈ {interpretation.radio_horizon_km:.0f} km · "
+            f"h {interpretation.antenna_height_m:g} m · k=4/3"
+        )
+        self.e_hop_value.setText(f"≈ {interpretation.e_layer_hop_km:.0f} km")
+        self.f2_hop_value.setText(f"≈ {interpretation.f2_layer_hop_km:.0f} km")
+        self.use_value.setText(USE_CASE_TEXT[self.language][interpretation.use_case])
 
     @staticmethod
     def _nearest_gain(rows, target):

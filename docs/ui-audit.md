@@ -16,6 +16,43 @@ that contain radiation data, applies equal physical axis ranges, formats table
 coordinates to six significant digits, reserves two visible wire rows at the
 minimum supported height, and localizes/resizes the candidate table.
 
+## 0.43 NEC take-off interpretation and candidate-grid correction
+
+Two operator captures from 0.42.0 established the regression baseline: a Yagi
+candidate grid stopped with an ASCII encoding exception, and the 3D far-field
+surface did not expose the horizon or explain that NEC theta is measured from
+zenith. The source failure was reproduced with the exact `·`/`Δ` candidate
+name, then exercised end to end with standalone OpenNEC 2.2.0 after the fix.
+The supplied before states are retained as
+`dialog-antenna-modeling-0.42-candidate-ascii-error-cze-dark.png` and
+`dialog-antenna-modeling-0.42-radiation-ambiguous-elevation-cze-dark.png`
+under [`docs/ui/before`](ui/before/).
+
+The first visual pass of the real revised dialog found and corrected:
+
+1. the practical interpretation form forced long Czech and English use/ground
+   wave explanations into an unreadably narrow value column;
+2. the horizon caption collided with the 270° reference while the 3D axes used
+   too little of the available plotting area;
+3. the single-row English toolbar clipped Create/Calculate controls in native
+   Classic at 1180×720;
+4. the peak direction value clipped its `dBi` suffix at the same breakpoint.
+
+The final dialog uses a two-row toolbar, non-scrolling four-tab bar, full-width
+interpretation paragraphs, a larger equal-scale upper-hemisphere surface,
+horizon plane, four azimuth references, and a marked peak ray. The 2D vertical
+cut is Cartesian with an explicit `0–90° elevation above horizon` axis and a
+peak guide. The information panel states that its E/F2 distances are spherical
+geometry for assumed virtual heights—not MUF/foF2, absorption, terrain,
+ground-wave, or link-budget predictions.
+
+Final evidence under [`docs/ui/after`](ui/after/) covers Czech Monitor Light at
+1180×720, English Monitor Dark at 1366×850 and 1920×1080, English Classic at
+1180×720, the corrected 2D results, and the populated candidate table. The same
+seven states were rendered and inspected in isolated processes at 125%, 150%,
+and 200% Qt scaling. No obvious P0/P1 clipping, overlap, theme-parity, or chart
+meaning issue remains.
+
 ## Evidence and method
 
 The current source was rendered with an isolated temporary SQLite database and

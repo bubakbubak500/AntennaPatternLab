@@ -8,6 +8,10 @@ from antenna_pattern_lab.nec_runner import (
     RUN_SCHEMA,
     NecRunCancelled,
     NecRunResult,
+    RadiationSample,
+    estimate_ionospheric_hop_distance_km,
+    estimate_radio_horizon_km,
+    interpret_radiation_pattern,
     parse_opennec_result,
 )
 
@@ -67,3 +71,44 @@ def test_run_result_json_is_versioned_and_reproducible():
     assert restored == result
     assert restored.schema == RUN_SCHEMA
     assert restored.radiation_at()[0].frequency_hz == 14_074_000
+
+
+def test_takeoff_interpretation_uses_elevation_above_horizon_and_spherical_hops():
+    samples = tuple(
+        RadiationSample(
+            14_074_000,
+            theta,
+            phi,
+            6.0 - abs(theta - 60.0) / 5.0 - abs(phi - 90.0) / 90.0,
+        )
+        for theta in range(0, 91, 5)
+        for phi in range(0, 360, 5)
+    )
+
+    interpretation = interpret_radiation_pattern(samples, antenna_height_m=10.0)
+
+    assert interpretation is not None
+    assert interpretation.peak_elevation_deg == 30.0
+    assert interpretation.peak_azimuth_deg == 90.0
+    assert interpretation.use_case == "medium"
+    assert sum(
+        (
+            interpretation.low_angle_fraction,
+            interpretation.medium_angle_fraction,
+            interpretation.high_angle_fraction,
+        )
+    ) == pytest.approx(1.0)
+    assert interpretation.e_layer_hop_km == pytest.approx(365.55, abs=0.1)
+    assert interpretation.f2_layer_hop_km == pytest.approx(934.06, abs=0.1)
+    assert interpretation.radio_horizon_km == pytest.approx(13.03, abs=0.1)
+
+
+def test_hop_and_horizon_estimates_validate_their_physical_ranges():
+    assert estimate_ionospheric_hop_distance_km(90.0, 300.0) == pytest.approx(0.0)
+    assert estimate_radio_horizon_km(0.0) == 0.0
+    with pytest.raises(ValueError):
+        estimate_ionospheric_hop_distance_km(-1.0, 300.0)
+    with pytest.raises(ValueError):
+        estimate_ionospheric_hop_distance_km(10.0, 0.0)
+    with pytest.raises(ValueError):
+        estimate_radio_horizon_km(-1.0)
