@@ -78,6 +78,7 @@ from .nec import NecPattern, parse_nec_output
 from .profile_dialog import AntennaProfileDialog
 from .profiles import expected_main_bearings
 from .propagation_dialog import PropagationConditionsDialog
+from .propagation_intelligence_dialog import PropagationIntelligenceDialog
 from .rotator_safety import (
     RotatorSafety,
     evaluate_rotator_safety,
@@ -160,6 +161,7 @@ TRANSLATIONS = {
         ),
         "coverage": "Pokrytí měření…",
         "propagation_conditions": "Podmínky šíření…",
+        "propagation_intelligence": "Propagation Intelligence…",
         "exit": "Ukončit",
         "about_text": "Antenna Pattern Lab {version}\n\nNástroj pro modelování a porovnávání směrových vyzařovacích diagramů antén z reálných záznamů radioamatérského provozu.\n\nFT8/WSPR a PSK Reporter slouží jako zdroje měřicích dat; cílem je odhadnout, vizualizovat a porovnávat chování anténních sestav.",
         "callsign": "Moje značka",
@@ -443,6 +445,7 @@ TRANSLATIONS = {
         ),
         "coverage": "Measurement coverage…",
         "propagation_conditions": "Propagation conditions…",
+        "propagation_intelligence": "Propagation Intelligence…",
         "exit": "Exit",
         "about_text": "Antenna Pattern Lab {version}\n\nA tool for modelling and comparing directional antenna radiation patterns from real amateur-radio operating records.\n\nFT8/WSPR and PSK Reporter provide measurement data; the goal is to estimate, visualize and compare antenna-system behaviour.",
         "callsign": "My callsign",
@@ -1093,6 +1096,10 @@ class MainWindow(QMainWindow):
         self.propagation_action.triggered.connect(
             self._open_propagation_conditions
         )
+        self.propagation_intelligence_action = QAction(self)
+        self.propagation_intelligence_action.triggered.connect(
+            self._open_propagation_intelligence
+        )
         self.tools_menu.addActions(
             [
                 self.profiles_action,
@@ -1101,6 +1108,7 @@ class MainWindow(QMainWindow):
                 self.campaigns_action,
                 self.coverage_action,
                 self.propagation_action,
+                self.propagation_intelligence_action,
             ]
         )
 
@@ -2578,6 +2586,9 @@ class MainWindow(QMainWindow):
         self.campaigns_action.setText(self._text("campaigns"))
         self.coverage_action.setText(self._text("coverage"))
         self.propagation_action.setText(self._text("propagation_conditions"))
+        self.propagation_intelligence_action.setText(
+            self._text("propagation_intelligence")
+        )
         self.communications_action.setText(self._text("communications"))
         self.external_tools_action.setText(self._text("external_tools"))
         self.updates_action.setText(self._text("updates"))
@@ -2708,6 +2719,13 @@ class MainWindow(QMainWindow):
 
     def _open_propagation_conditions(self) -> None:
         PropagationConditionsDialog(
+            self.repository,
+            self.language_code,
+            self,
+        ).exec()
+
+    def _open_propagation_intelligence(self) -> None:
+        PropagationIntelligenceDialog(
             self.repository,
             self.language_code,
             self,

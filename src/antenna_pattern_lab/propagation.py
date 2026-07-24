@@ -322,7 +322,7 @@ class PropagationCache:
 
 
 class NoaaSwpcClient:
-    USER_AGENT = "AntennaPatternLab/0.40 (+https://github.com/bubakbubak500/AntennaPatternLab)"
+    USER_AGENT = "AntennaPatternLab/0.41 (+https://github.com/bubakbubak500/AntennaPatternLab)"
     MAX_JSON_BYTES = 4 * 1024 * 1024
     MAX_IMAGE_BYTES = 8 * 1024 * 1024
 

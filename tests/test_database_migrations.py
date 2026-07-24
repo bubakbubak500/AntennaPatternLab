@@ -182,7 +182,7 @@ def test_schema_v1_spots_gain_psk_reporter_source_without_data_loss(tmp_path):
     repository = SpotRepository(path)
     spots = repository.list_spots()
 
-    assert repository.schema_version == 3
+    assert repository.schema_version == SpotRepository.SCHEMA_VERSION
     assert repository.migration_performed
     assert len(spots) == 1
     assert spots[0].source == "pskreporter"

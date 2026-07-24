@@ -226,49 +226,55 @@ Propagation Intelligence naváže na reprodukovatelná data z milníku 9 a vztá
 
 ### Propagation Intelligence — kontext trasy a pásma
 
-- [ ] Vytvořit samostatný pracovní pohled **Propagation Intelligence**, nikoli další souhrnný panel kosmického počasí.
-- [ ] Pro zvolený TX, čas, pásmo a cílový RX/sektor vykreslit velkou kružnici, denní/noční stranu a grayline; výpočet musí být lokální a reprodukovatelný.
-- [ ] Vyhodnotit, zda trasa protíná osvětlenou oblast se zvýšenou D-RAP absorpcí, polární oblast při zvýšeném protonovém toku nebo oblast s nedostatečným ionosférickým podkladem.
-- [ ] Přiřadit trase nejbližší časově platná měření GIRO a dostupný WAM-IPE/GloTEC model; zobrazit jejich vzdálenost od trasy, stáří a kvalitativní omezení.
-- [ ] Zobrazit pozorovanou/modelovanou MUF a provozní frekvenci společně, ale výsledek formulovat jako podklad pro rozhodnutí, nikoli jako záruku spojení.
-- [ ] Nabídnout stručné vysvětlení „co právě trasu ovlivňuje“ a „která data chybějí“; žádné jediné neprůhledné skóre propagace.
-- [ ] Umožnit přehrání podmínek v čase kampaně a jejich synchronizaci s TX relacemi, reporty a změnami coverage.
-- [ ] Vytvořit verzovaný soubor příznaků pro pozdější normalizaci: pásmo, místní sluneční čas na trase, den/noc/grayline, vzdálenost, D-RAP absorpce, `foF2`/MUF, Kp/Dst, X-ray/protonový stav a dostupnost zdrojů.
-- [ ] Propagační příznaky nesmějí zpětně měnit raw data; budou uloženy jako odvoditelný, verzovaný analytický podklad se vstupním hashem.
-- [ ] Při chybějících nebo starých datech Propagation Intelligence výslovně sníží jistotu nebo odmítne závěr namísto tichého dosazení běžné hodnoty.
-- [ ] Přenést do každého odvozeného příznaku kvalitu GIRO škálování (`CS`, automatické versus ruční), stáří jednotlivého zdroje a identitu poskytujícího GOES/RTSW satelitu; nejistoty zdrojů se nesmějí sloučit do jediného skóre.
-- [ ] Verzi katalogu ionosond, licenční omezení GIRO a povinné poděkování konkrétnímu provozovateli stanice zahrnout do provenance analytického výsledku i budoucího reportu.
-- [ ] Vyhodnocení trasy proti D‑RAP a GloTEC provádět prostorově nad příslušnou mapou a jejím quality podkladem; globální maximum ani nejbližší pixel nesmí být použity jako náhrada celé trasy.
-- [ ] Při synchronizaci kampaně zachovat samostatné hodiny NOAA, GIRO, GloTEC, TX relací a reportů, zobrazit toleranci časového přiřazení a uložit hash vstupního snapshotu i RX sítě.
+- [x] Vytvořit samostatný pracovní pohled **Propagation Intelligence**, nikoli další souhrnný panel kosmického počasí.
+- [x] Pro zvolený TX, čas, pásmo a cílový RX/sektor vykreslit velkou kružnici, denní/noční stranu a grayline; výpočet musí být lokální a reprodukovatelný.
+- [x] Vyhodnotit, zda trasa protíná osvětlenou oblast se zvýšenou D-RAP absorpcí, polární oblast při zvýšeném protonovém toku nebo oblast s nedostatečným ionosférickým podkladem.
+- [x] Přiřadit trase nejbližší časově platná měření GIRO a dostupný WAM-IPE/GloTEC model; zobrazit jejich vzdálenost od trasy, stáří a kvalitativní omezení.
+- [x] Zobrazit pozorovanou/modelovanou MUF a provozní frekvenci společně, ale výsledek formulovat jako podklad pro rozhodnutí, nikoli jako záruku spojení.
+- [x] Nabídnout stručné vysvětlení „co právě trasu ovlivňuje“ a „která data chybějí“; žádné jediné neprůhledné skóre propagace.
+- [x] Umožnit přehrání podmínek v čase kampaně a jejich synchronizaci s TX relacemi, reporty a změnami coverage.
+- [x] Vytvořit verzovaný soubor příznaků pro pozdější normalizaci: pásmo, místní sluneční čas na trase, den/noc/grayline, vzdálenost, D-RAP absorpce, `foF2`/MUF, Kp/Dst, X-ray/protonový stav a dostupnost zdrojů.
+- [x] Propagační příznaky nesmějí zpětně měnit raw data; budou uloženy jako odvoditelný, verzovaný analytický podklad se vstupním hashem.
+- [x] Při chybějících nebo starých datech Propagation Intelligence výslovně sníží jistotu nebo odmítne závěr namísto tichého dosazení běžné hodnoty.
+- [x] Přenést do každého odvozeného příznaku kvalitu GIRO škálování (`CS`, automatické versus ruční), stáří jednotlivého zdroje a identitu poskytujícího GOES/RTSW satelitu; nejistoty zdrojů se nesmějí sloučit do jediného skóre.
+- [x] Verzi katalogu ionosond, licenční omezení GIRO a povinné poděkování konkrétnímu provozovateli stanice zahrnout do provenance analytického výsledku i budoucího reportu.
+- [x] Vyhodnocení trasy proti D‑RAP a GloTEC provádět prostorově nad příslušnou mapou a jejím quality podkladem; globální maximum ani nejbližší pixel nesmí být použity jako náhrada celé trasy.
+- [x] Při synchronizaci kampaně zachovat samostatné hodiny NOAA, GIRO, GloTEC, TX relací a reportů, zobrazit toleranci časového přiřazení a uložit hash vstupního snapshotu i RX sítě.
 
 ### 1. NEC baseline
 
-- [ ] Teoretická reference s azimutovým a elevačním diagramem, relativním nebo absolutním gainem a předozadním poměrem.
-- [ ] Varianty výšky antény a několika dokumentovaných modelů půdy; každá křivka ponese parametry modelu, frekvenci, polarizaci a původ NEC výstupu.
-- [ ] Společná úhlová osa, jednotky a explicitní zarovnání orientace pro bezpečné překrytí s empirickými vrstvami.
+- [x] Teoretická reference s azimutovým a elevačním diagramem, relativním nebo absolutním gainem a předozadním poměrem.
+- [x] Varianty výšky antény a několika dokumentovaných modelů půdy; každá křivka ponese parametry modelu, frekvenci, polarizaci a původ NEC výstupu.
+- [x] Společná úhlová osa, jednotky a explicitní zarovnání orientace pro bezpečné překrytí s empirickými vrstvami.
 
 ### 2. Empirický raw diagram
 
-- [ ] Samostatně označený diagram **Coverage / pozorované pokrytí**, nikdy „antenna gain“.
-- [ ] V každém azimutovém sektoru zobrazit počet reportů a unikátních reportérů, nejlepší a mediánové SNR, maximální vzdálenost, hustotu reportů a kvalitu/nejistotu.
-- [ ] Zachovat časové, vzdálenostní, pásmové, módové, výkonové, zdrojové a kampaňové filtry a viditelně uvést jejich aktivní hodnoty.
-- [ ] Nevyplňovat směry bez dat a nepřevádět nerovnoměrnou síť přijímačů na zdánlivě kalibrovaný zisk.
+- [x] Samostatně označený diagram **Coverage / pozorované pokrytí**, nikdy „antenna gain“.
+- [x] V každém azimutovém sektoru zobrazit počet reportů a unikátních reportérů, nejlepší a mediánové SNR, maximální vzdálenost, hustotu reportů a kvalitu/nejistotu.
+- [x] Zachovat časové, vzdálenostní, pásmové, módové, výkonové, zdrojové a kampaňové filtry a viditelně uvést jejich aktivní hodnoty.
+- [x] Nevyplňovat směry bez dat a nepřevádět nerovnoměrnou síť přijímačů na zdánlivě kalibrovaný zisk.
 
 ### 3. Propagation-normalized diagram
 
-- [ ] Volitelný očekávaný baseline z VOACAP/REC533 nebo z jednoduššího verzovaného statistického modelu; použitý model a jeho vstupy musí být viditelné a reprodukovatelné.
-- [ ] Pro každý azimut odhadnout relativní empirickou odchylku:
+- [x] Volitelný očekávaný baseline z VOACAP/REC533 nebo z jednoduššího verzovaného statistického modelu; použitý model a jeho vstupy musí být viditelné a reprodukovatelné.
+- [x] Pro každý azimut odhadnout relativní empirickou odchylku:
 
   `EmpiricalGain(az) = median(SNR_observed − SNR_expected)`
 
-- [ ] Po společném referenčním zarovnání porovnat normalizovaný empirický tvar s NEC:
+- [x] Po společném referenčním zarovnání porovnat normalizovaný empirický tvar s NEC:
 
   `Difference(az) = EmpiricalGain(az) − NECGain(az)`
 
-- [ ] Zobrazit křivky NEC, raw coverage, propagation-normalized odhad a jejich rozdíl samostatně i v synchronizovaném porovnání, včetně intervalů nejistoty a sektorů bez dostatečných dat.
-- [ ] Rezidua interpretovat pouze jako **podezření k ověření**, například stínění budovou nebo terénem, neočekávané potlačení směru, common-mode proudy, nesprávnou orientaci antény či nevhodný předpoklad modelu půdy.
-- [ ] Nikdy z rezidua automaticky neurčovat příčinu; nabídnout navazující kontrolovaný A/B experiment nebo kontrolu sestavy.
-- [ ] Křížová validace po časových blocích: normalizační model vytvořit z části kampaně a ověřit na dosud nepoužitých datech.
+- [x] Zobrazit křivky NEC, raw coverage, propagation-normalized odhad a jejich rozdíl samostatně i v synchronizovaném porovnání, včetně intervalů nejistoty a sektorů bez dostatečných dat.
+- [x] Rezidua interpretovat pouze jako **podezření k ověření**, například stínění budovou nebo terénem, neočekávané potlačení směru, common-mode proudy, nesprávnou orientaci antény či nevhodný předpoklad modelu půdy.
+- [x] Nikdy z rezidua automaticky neurčovat příčinu; nabídnout navazující kontrolovaný A/B experiment nebo kontrolu sestavy.
+- [x] Křížová validace po časových blocích: normalizační model vytvořit z části kampaně a ověřit na dosud nepoužitých datech.
+
+### Dokončení milníku 10 — 0.41.0
+
+- [x] Samostatný pracovní pohled, verzovaný analytický podklad, tři vědecky
+  oddělené vrstvy, migrace databáze, bloková validace, CZE/ENG dokumentace a
+  vizuální matice Monitor Light / Dark / Classic jsou součástí vydání 0.41.0.
 
 ## Milník 11 — reporty a přenositelnost
 

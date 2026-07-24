@@ -139,7 +139,46 @@ propagation forecast and does not turn coverage reports into calibrated antenna
 gain. `foF2`, MUF, and TEC are situational evidence, not a guarantee that a
 specific path will open and not an automatic correction of SNR.
 
-## 9. Import and export
+## 9. Propagation Intelligence
+
+Open **Tools → Propagation Intelligence** after reports and at least one
+propagation snapshot have been saved to a campaign. Select a target receiver and
+move the campaign-time slider to replay the route. The map calculates the great
+circle, day/night side, grayline, and local solar time locally; it does not make
+an automatic network request.
+
+The route summary assigns only time-valid NOAA and GIRO evidence. It shows the
+assignment tolerance, source clocks, distance of the selected ionosonde from
+the complete route, scaling quality, satellite identity, and missing or stale
+sources. D-RAP and GloTEC are evaluated across the route when spatial products
+are available. A global maximum or one nearest pixel is not substituted for the
+route, and TEC remains qualitative context rather than an SNR correction.
+
+The **Three layers** tab keeps these results distinct:
+
+- **NEC theoretical reference**: imported azimuth and elevation cuts with
+  frequency, polarization, height/ground-model metadata, orientation, source,
+  absolute/relative gain, and front-to-back ratio;
+- **Coverage / observed shape**: report and receiver counts, best and median
+  SNR, maximum distance, report density, quality, and confidence intervals;
+- **Propagation-normalized estimate**: median observed-minus-expected residual
+  from the displayed versioned statistical path model.
+
+The chart median-aligns shapes to a common reference and leaves unsupported
+sectors empty. The table retains the underlying absolute observed SNR. The
+normalization is cross-validated by campaign time blocks. If required inputs are
+missing or stale, the result is explicitly marked insufficient rather than
+filled with typical values.
+
+Use **Save analytical basis** to store the feature schema, input and snapshot
+SHA-256 values, receiver-network hash, source clocks, individual uncertainties,
+GIRO license/attribution, and model inputs in a separate database table. Raw
+reports and snapshots are never modified. A residual is only a suspicion for a
+controlled A/B experiment; the application does not automatically claim a
+building, terrain, common-mode current, orientation, or ground model as its
+cause.
+
+## 10. Import and export
 
 Use **Data → Import data** for CSV, ADI, or ADIF files. In a completed QSO,
 `RST_RCVD` is interpreted as the report the remote station sent about your signal.
@@ -148,14 +187,14 @@ to the wider passive PSK Reporter dataset.
 
 CSV export can be used for independent analysis or archival.
 
-## 10. Appearance
+## 11. Appearance
 
 Open **Settings → Appearance…** to retain the native **Classic** interface or
 enable the compact **Monitor** design. Monitor provides **Dark**, **Light**, and
 **Follow system** themes. The preference is saved automatically. Follow system
 tracks Windows color-scheme changes while the application remains open.
 
-## 11. Updates
+## 12. Updates
 
 Open **Settings → Updates** to check the official GitHub release channel. Automatic
 checks run in the background on every startup. If the internet or GitHub is
@@ -173,7 +212,7 @@ Current releases are not Authenticode-signed, so Windows may report an unknown
 publisher or show a SmartScreen warning. Download only from the official GitHub
 Releases page and compare the installer with the published SHA-256 checksum.
 
-## 12. Diagnostics and data
+## 13. Diagnostics and data
 
 Application data is stored outside the installation directory and is preserved by
 an in-place upgrade. The diagnostics export helps with support requests but should

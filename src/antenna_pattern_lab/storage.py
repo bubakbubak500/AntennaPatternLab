@@ -16,6 +16,7 @@ from .exposure import ActivityWindow, ExposureObservation
 from .geo import grid_distance_and_bearing
 from .profiles import AntennaProfile
 from .propagation import PropagationSnapshot
+from .propagation_intelligence import PropagationFeatures
 from .propagation_analysis import (
     CampaignPropagationAnalysis,
     PropagationRecord,
@@ -29,7 +30,7 @@ class DatabaseMigrationError(RuntimeError):
 
 class SpotRepository:
     MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
-    SCHEMA_VERSION = 3
+    SCHEMA_VERSION = 4
     BACKUP_RETENTION = 5
 
     def __init__(self, database_path: str | Path):
@@ -182,6 +183,28 @@ class SpotRepository:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS propagation_snapshot_campaign_idx "
                 "ON propagation_snapshots(campaign_id, observed_at DESC)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS propagation_feature_sets (
+                    id INTEGER PRIMARY KEY,
+                    campaign_id INTEGER NOT NULL,
+                    computed_at TEXT NOT NULL,
+                    target_at TEXT NOT NULL,
+                    tx_grid TEXT NOT NULL,
+                    rx_grid TEXT NOT NULL,
+                    schema TEXT NOT NULL,
+                    input_sha256 TEXT NOT NULL,
+                    snapshot_sha256 TEXT NOT NULL,
+                    receiver_network_sha256 TEXT NOT NULL,
+                    feature_json TEXT NOT NULL,
+                    UNIQUE(campaign_id, input_sha256)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS propagation_feature_campaign_idx "
+                "ON propagation_feature_sets(campaign_id, target_at DESC)"
             )
             connection.execute(
                 """
@@ -754,6 +777,69 @@ class SpotRepository:
                 (campaign_id, limit),
             ).fetchall()
         return [_row_to_propagation_snapshot(row) for row in rows]
+
+    def save_propagation_features(
+        self,
+        features: PropagationFeatures,
+    ) -> PropagationFeatures:
+        if features.campaign_id is None or features.campaign_id < 1:
+            raise ValueError("Campaign ID is required.")
+        payload = features.canonical_json()
+        restored = PropagationFeatures.from_json(payload)
+        if restored.input_sha256 != features.input_sha256:
+            raise ValueError("Propagation-feature serialization changed its hash.")
+        with self._connect() as connection:
+            if connection.execute(
+                "SELECT 1 FROM measurement_campaigns WHERE id = ?",
+                (features.campaign_id,),
+            ).fetchone() is None:
+                raise ValueError("Measurement campaign does not exist.")
+            connection.execute(
+                """
+                INSERT INTO propagation_feature_sets (
+                    campaign_id, computed_at, target_at, tx_grid, rx_grid,
+                    schema, input_sha256, snapshot_sha256,
+                    receiver_network_sha256, feature_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(campaign_id, input_sha256) DO UPDATE SET
+                    computed_at = excluded.computed_at,
+                    feature_json = excluded.feature_json
+                """,
+                (
+                    features.campaign_id,
+                    features.computed_at.isoformat(),
+                    features.target_at.isoformat(),
+                    features.tx_grid,
+                    features.rx_grid,
+                    features.schema,
+                    features.input_sha256,
+                    features.snapshot_sha256,
+                    features.receiver_network_sha256,
+                    payload,
+                ),
+            )
+        return restored
+
+    def list_propagation_features(
+        self,
+        campaign_id: int,
+        *,
+        limit: int = 1000,
+    ) -> list[PropagationFeatures]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT feature_json FROM propagation_feature_sets
+                WHERE campaign_id = ?
+                ORDER BY target_at DESC, id DESC
+                LIMIT ?
+                """,
+                (campaign_id, limit),
+            ).fetchall()
+        return [
+            PropagationFeatures.from_json(str(row["feature_json"]))
+            for row in rows
+        ]
 
     def analyze_campaign_propagation(
         self,

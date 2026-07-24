@@ -45,6 +45,9 @@ confirmation.
   WSA–ENLIL context with offline campaign snapshots;
 - nearby GIRO/DIDBase ionosonde measurements and campaign condition/sensitivity
   analysis;
+- route-specific Propagation Intelligence with local great-circle/daylight
+  replay, versioned provenance, blocked validation, and separate NEC,
+  observed-coverage, and propagation-normalized layers;
 - ADIF/ADI and CSV import, plus CSV export;
 - local SQLite storage and diagnostic export;
 - English and Czech application UI;

@@ -559,3 +559,46 @@ Verification:
 - full suite after implementation: `173 passed`;
 - 100% and 200% rendered state matrix inspected;
 - `git diff --check` clean.
+
+## 0.41 milestone 10 Propagation Intelligence validation
+
+The new real `PropagationIntelligenceDialog` was rendered on 2026-07-24 with
+isolated campaign reports, a canonical NOAA/GIRO snapshot, GloTEC point-grid
+quality, and no radio, rotator, collector, transmission, or automatic network
+action. The renderer is `tools/render_propagation_intelligence.py`.
+
+Final evidence under [`docs/ui/after`](ui/after/) covers:
+
+- `dialog-propagation-intelligence-eng-light-route-1180x720.png`: Monitor Light,
+  English, minimum target, populated route and explicit missing D-RAP state;
+- `dialog-propagation-intelligence-eng-dark-layers-1366x850.png`: Monitor Dark,
+  English, reference-aligned three-layer chart, analytical table, active
+  filters, and block-validation result;
+- `dialog-propagation-intelligence-cze-light-provenance-1366x850.png`: Monitor
+  Light, Czech, versioned feature JSON and save action;
+- `dialog-propagation-intelligence-eng-classic-route-1180x720.png`: native
+  Classic parity;
+- `dialog-propagation-intelligence-eng-dark-layers-1920x1080.png`: large
+  workspace behavior;
+- `dialog-propagation-intelligence-cze-light-empty-1000x680.png`: Czech empty
+  state with unavailable controls disabled.
+
+All six states were also rendered at `QT_SCALE_FACTOR=2`. The long campaign
+name, receiver selector, timeline, tabs, route facts, chart labels, technical
+table, provenance JSON, localized Close button, and primary save action remained
+reachable without clipping or overlap.
+
+The first visual pass found and corrected:
+
+1. filtered chart points were joined across unsupported azimuth sectors;
+2. absolute raw SNR was overlaid against a relative normalized shape before a
+   common median reference alignment;
+3. the Czech Close button retained its native English label;
+4. empty-state receiver, playback, and timeline controls remained enabled;
+5. sector azimuth initially sorted lexicographically instead of numerically.
+
+The final review found no obvious P0 or P1 issue. Unsupported sectors remain
+empty, the table retains absolute evidence while the chart compares explicitly
+aligned shapes, scientific limitations are visible without relying on color,
+and missing D-RAP prevents a supported conclusion rather than silently applying
+a normal value.
